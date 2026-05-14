@@ -41,8 +41,8 @@ const LS_KEYS = {
 // ── Polling config ──────────────────────────────────────────────────────────
 // Exponential backoff: starts at POLL_MIN_MS, doubles each attempt, caps at POLL_MAX_MS.
 // Total budget: ~300 s (5 minutes) before the soft-timeout fires.
-const POLL_MIN_MS    = 2_000   // 2 s  – initial interval
-const POLL_MAX_MS    = 10_000  // 10 s – maximum interval
+const POLL_MIN_MS = 2_000   // 2 s  – initial interval
+const POLL_MAX_MS = 10_000  // 10 s – maximum interval
 const POLL_BUDGET_MS = 300_000 // 5 min total
 
 export default function DashboardPage() {
@@ -62,9 +62,9 @@ export default function DashboardPage() {
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timedOutJobId, setTimedOutJobId] = useState<string | null>(null)
 
-  const pollingTimerRef  = useRef<NodeJS.Timeout | null>(null)
-  const pollStartRef     = useRef<number>(0)       // wall-clock start of the current poll
-  const pollIntervalRef  = useRef<number>(POLL_MIN_MS) // current backoff interval
+  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
+  const pollIntervalRef = useRef<number>(POLL_MIN_MS) // current backoff interval
 
   // Clean up polling timer on unmount
   useEffect(() => {
@@ -117,14 +117,14 @@ export default function DashboardPage() {
     setIsTimedOut(false)
     setTimedOutJobId(null)
     pollJob(savedJobId, session.access_token)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, isInitialized])
 
   const fetchQueries = async () => {
     try {
       const supabase = createClient()
       const { data: { session: currentSession } } = await supabase.auth.getSession()
-      
+
       if (!currentSession?.access_token) {
         console.error("[Frontend] No valid session for fetching queries.")
         router.push("/login")
@@ -132,9 +132,12 @@ export default function DashboardPage() {
       }
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries`, {
-        headers: { Authorization: `Bearer ${currentSession.access_token}` },
+        headers: {
+          Authorization: `Bearer ${currentSession.access_token}`,
+          "ngrok-skip-browser-warning": "69420"
+        },
       })
-      
+
       if (response.status === 401) {
         console.error("[Frontend] Token expirado al obtener consultas. Redirigiendo...")
         toast({
@@ -206,7 +209,7 @@ export default function DashboardPage() {
     // [Safety Mechanism]: Validate form strictly before setting loading state
     // Prevents trapping user in an infinite loading state if validation fails
     const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
-    
+
     // Validate ONLY the required fields. We completely ignore advanced optional fields if empty.
     if (!sector?.trim() || !pais?.trim() || !tamano_empresa?.trim() || !cargo_decision?.trim() || !dolor_cliente?.trim() || !propuesta_valor?.trim()) {
       toast({
@@ -276,7 +279,7 @@ export default function DashboardPage() {
       }
 
       const data = await response.json()
-      
+
       if (data.job_id) {
         console.log(`[Frontend] Job iniciado con ID: ${data.job_id}. Iniciando polling...`)
         toast({
@@ -313,13 +316,17 @@ export default function DashboardPage() {
     try { localStorage.setItem(LS_KEYS.jobId, jobId) } catch { /* ignore */ }
 
     // Reset backoff counters for this poll session
-    pollStartRef.current    = Date.now()
+    pollStartRef.current = Date.now()
     pollIntervalRef.current = POLL_MIN_MS
 
     const checkStatus = async () => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/prospect/job/${jobId}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "ngrok-skip-browser-warning": "69420",
+            "Content-Type": "application/json"
+          },
         })
 
         if (response.status === 401) {
@@ -407,7 +414,7 @@ export default function DashboardPage() {
     }
 
     checkStatus()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, toast])
 
   /**
@@ -423,7 +430,10 @@ export default function DashboardPage() {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/prospect/job/${timedOutJobId}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "ngrok-skip-browser-warning": "69420"
+        },
       })
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -468,6 +478,7 @@ export default function DashboardPage() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
+            "ngrok-skip-browser-warning": "69420"
           },
           body: JSON.stringify({ query_name: name, search_params: form }),
         })
@@ -477,6 +488,7 @@ export default function DashboardPage() {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
+            "ngrok-skip-browser-warning": "69420"
           },
           body: JSON.stringify({ query_name: name, search_params: form }),
         })
@@ -519,7 +531,10 @@ export default function DashboardPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "ngrok-skip-browser-warning": "69420"
+        },
       })
       if (response.ok) {
         toast({
