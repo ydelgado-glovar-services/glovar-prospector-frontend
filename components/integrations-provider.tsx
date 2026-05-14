@@ -21,7 +21,7 @@ interface IntegrationsContextValue {
 const IntegrationsContext = createContext<IntegrationsContextValue>({
   isConnected: false,
   isLoading: true,
-  checkStatus: async () => {},
+  checkStatus: async () => { },
   sendEmail: async () => false,
 })
 
@@ -47,7 +47,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/google/status", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/status`, {
         headers: {
           "Authorization": `Bearer ${session.access_token}`
         }
@@ -90,7 +90,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/auth/google/send-email", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/send-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
