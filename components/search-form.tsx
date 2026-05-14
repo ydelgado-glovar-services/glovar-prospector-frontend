@@ -1,0 +1,340 @@
+"use client"
+
+import { FormEvent, useState } from "react"
+import { Loader2, Play, AlertCircle } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
+import { Textarea } from "@/components/ui/textarea"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import type { CompanySize, ProspectRequest } from "@/lib/types"
+
+interface SearchFormProps {
+  values: ProspectRequest
+  isLoading: boolean
+  onChange: (patch: Partial<ProspectRequest>) => void
+  onSubmit: () => void
+  onClear?: () => void
+}
+
+export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: SearchFormProps) {
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  const handleFieldChange = (patch: Partial<ProspectRequest>) => {
+    onChange(patch)
+    const key = Object.keys(patch)[0]
+    if (key && formErrors[key]) {
+      setFormErrors((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+    }
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    
+    const newErrors: Record<string, string> = {}
+    
+    if (!values.mi_empresa?.trim()) newErrors.mi_empresa = "Campo obligatorio"
+    if (!values.sector?.trim()) newErrors.sector = "Campo obligatorio"
+    if (!values.pais?.trim()) newErrors.pais = "Campo obligatorio"
+    if (!values.tamano_empresa?.trim()) newErrors.tamano_empresa = "Campo obligatorio"
+    if (!values.cargo_decision?.trim()) newErrors.cargo_decision = "Campo obligatorio"
+    if (!values.dolor_cliente?.trim()) newErrors.dolor_cliente = "Campo obligatorio"
+    if (!values.propuesta_valor?.trim()) newErrors.propuesta_valor = "Campo obligatorio"
+    
+    if (Object.keys(newErrors).length > 0) {
+      setFormErrors(newErrors)
+      return
+    }
+    
+    setFormErrors({})
+    onSubmit()
+  }
+
+  return (
+    <Card className="h-full border-border/80 shadow-sm">
+      <CardHeader className="space-y-1 pb-4">
+        <CardTitle className="text-lg font-semibold">Criterios de búsqueda</CardTitle>
+        <CardDescription className="text-sm">
+          Define el perfil ideal de cliente. La IA orquestará la búsqueda y enriquecimiento.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="mi_empresa" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Mi Empresa (Remitente)
+              </Label>
+              <Input
+                id="mi_empresa"
+                name="mi_empresa"
+                placeholder="Ej: Glovar Services"
+                value={values.mi_empresa || ""}
+                onChange={(event) => handleFieldChange({ mi_empresa: event.target.value })}
+                disabled={isLoading}
+                className={formErrors.mi_empresa ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {formErrors.mi_empresa && (
+                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" /> {formErrors.mi_empresa}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="sector" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Sector Objetivo
+              </Label>
+              <Input
+                id="sector"
+                name="sector"
+                placeholder="Ej: Salud"
+                value={values.sector}
+                onChange={(event) => handleFieldChange({ sector: event.target.value })}
+                disabled={isLoading}
+                className={formErrors.sector ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {formErrors.sector && (
+                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" /> {formErrors.sector}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="pais" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                País
+              </Label>
+              <Input
+                id="pais"
+                name="pais"
+                placeholder="Ej: Estados Unidos"
+                value={values.pais}
+                onChange={(event) => handleFieldChange({ pais: event.target.value })}
+                disabled={isLoading}
+                className={formErrors.pais ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {formErrors.pais && (
+                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" /> {formErrors.pais}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="tamano" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Tamaño de empresa
+              </Label>
+              <Select
+                value={values.tamano_empresa || undefined}
+                onValueChange={(value) => handleFieldChange({ tamano_empresa: value as CompanySize })}
+                disabled={isLoading}
+              >
+                <SelectTrigger 
+                  id="tamano" 
+                  className={`w-full ${formErrors.tamano_empresa ? "border-red-500 focus:ring-red-500" : ""}`}
+                >
+                  <SelectValue placeholder="Selecciona un rango" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1-50">1-50 empleados</SelectItem>
+                  <SelectItem value="51-200">51-200 empleados</SelectItem>
+                  <SelectItem value="201-500">201-500 empleados</SelectItem>
+                  <SelectItem value="500+">500+ empleados</SelectItem>
+                </SelectContent>
+              </Select>
+              {formErrors.tamano_empresa && (
+                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" /> {formErrors.tamano_empresa}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="cargo" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Cargo del tomador de decisión
+              </Label>
+              <Input
+                id="cargo"
+                name="cargo"
+                placeholder="Ej: CEO"
+                value={values.cargo_decision}
+                onChange={(event) => handleFieldChange({ cargo_decision: event.target.value })}
+                disabled={isLoading}
+                className={formErrors.cargo_decision ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {formErrors.cargo_decision && (
+                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" /> {formErrors.cargo_decision}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="dolor" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Dolor del cliente a resolver
+            </Label>
+            <Textarea
+              id="dolor"
+              name="dolor"
+              placeholder="Describe el problema concreto que tu producto resuelve para este perfil..."
+              value={values.dolor_cliente}
+              onChange={(event) => handleFieldChange({ dolor_cliente: event.target.value })}
+              disabled={isLoading}
+              rows={4}
+              className={formErrors.dolor_cliente ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {formErrors.dolor_cliente && (
+              <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                <AlertCircle className="w-3 h-3" /> {formErrors.dolor_cliente}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="propuesta" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Propuesta de valor / Resultado
+            </Label>
+            <Textarea
+              id="propuesta"
+              name="propuesta"
+              placeholder="Resultado tangible que entregas (ej: reducir 30% el churn en 90 días)..."
+              value={values.propuesta_valor}
+              onChange={(event) => handleFieldChange({ propuesta_valor: event.target.value })}
+              disabled={isLoading}
+              rows={4}
+              className={formErrors.propuesta_valor ? "border-red-500 focus-visible:ring-red-500" : ""}
+            />
+            {formErrors.propuesta_valor && (
+              <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                <AlertCircle className="w-3 h-3" /> {formErrors.propuesta_valor}
+              </span>
+            )}
+          </div>
+
+          <Accordion type="single" collapsible className="w-full border rounded-md px-4 py-1 bg-card">
+            <AccordionItem value="opciones-comerciales" className="border-none">
+              <AccordionTrigger className="text-sm font-semibold hover:no-underline py-3">
+                Opciones Comerciales Avanzadas (Opcional)
+              </AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-5 pt-1 pb-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="triggers_compra" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Triggers de Compra
+                  </Label>
+                  <Textarea
+                    id="triggers_compra"
+                    name="triggers_compra"
+                    placeholder="Ej: apertura de operaciones, quejas de clientes"
+                    value={values.triggers_compra || ""}
+                    onChange={(event) => handleFieldChange({ triggers_compra: event.target.value })}
+                    disabled={isLoading}
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="casos_exito" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Casos de Éxito / Diferenciadores
+                  </Label>
+                  <Textarea
+                    id="casos_exito"
+                    name="casos_exito"
+                    placeholder="Ej: reducción de tiempo 60%, entregables en 2 semanas"
+                    value={values.casos_exito || ""}
+                    onChange={(event) => handleFieldChange({ casos_exito: event.target.value })}
+                    disabled={isLoading}
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="keywords_industria" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Keywords de Industria
+                  </Label>
+                  <Textarea
+                    id="keywords_industria"
+                    name="keywords_industria"
+                    placeholder="Ej: cold chain excursion, SLAs"
+                    value={values.keywords_industria || ""}
+                    onChange={(event) => handleFieldChange({ keywords_industria: event.target.value })}
+                    disabled={isLoading}
+                    rows={2}
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="limite" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Límite de perfiles a analizar
+              </Label>
+              <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-sm font-bold font-mono text-primary">
+                {values.limite_perfiles ?? 30}
+              </span>
+            </div>
+            <Slider
+              id="limite"
+              min={5}
+              max={30}
+              step={1}
+              value={[values.limite_perfiles ?? 30]}
+              onValueChange={(val) => handleFieldChange({ limite_perfiles: val[0] })}
+              disabled={isLoading}
+              className="w-full"
+            />
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+              <span>5</span>
+              <span>30</span>
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-col gap-2">
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full font-medium"
+              disabled={isLoading}
+              aria-busy={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  <span>Ejecutando prospección...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" aria-hidden="true" />
+                  <span>Ejecutar Prospección Autónoma</span>
+                </>
+              )}
+            </Button>
+            {onClear && (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full font-medium text-muted-foreground hover:text-foreground"
+                onClick={onClear}
+                disabled={isLoading}
+              >
+                Limpiar Búsqueda
+              </Button>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
