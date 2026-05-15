@@ -40,3 +40,9 @@ export interface SavedQuery {
   created_at: string
   updated_at: string
 }
+
+export interface JobProgress {
+  phase: string
+  processed: number
+  total: number
+}

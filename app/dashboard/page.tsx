@@ -16,7 +16,7 @@ import { ResultsPanel } from "@/components/results-panel"
 import { SearchForm } from "@/components/search-form"
 import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase"
-import type { ProspectRequest, ProspectResult, SavedQuery } from "@/lib/types"
+import type { ProspectRequest, ProspectResult, SavedQuery, JobProgress } from "@/lib/types"
 import { apiFetch } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -62,6 +62,9 @@ export default function DashboardPage() {
   // Timeout-fallback state — shown when polling exhausts its budget
   const [isTimedOut, setIsTimedOut] = useState(false)
   const [timedOutJobId, setTimedOutJobId] = useState<string | null>(null)
+
+  // Granular progress for the progress bar
+  const [jobProgress, setJobProgress] = useState<JobProgress>({ phase: "", processed: 0, total: 0 })
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
@@ -343,6 +346,7 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(false)
           setTimedOutJobId(null)
+          setJobProgress({ phase: "Completado", processed: data.processed_leads ?? leads.length, total: data.total_leads ?? leads.length })
           toast({
             title: "✅ Prospección completada",
             description: `Se encontraron ${leads.length} leads.`,
@@ -363,10 +367,17 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(false)
           setTimedOutJobId(null)
+          setJobProgress({ phase: "", processed: 0, total: 0 })
           return
         }
 
-        // ── Still pending / processing ───────────────────────────────────────
+        // ── Still pending / processing ────────────────────────────────────────────
+        // Update granular progress
+        setJobProgress({
+          phase: data.current_phase ?? "",
+          processed: data.processed_leads ?? 0,
+          total: data.total_leads ?? 0,
+        })
         // Check if we've exhausted the total 5-minute budget
         if (elapsed >= POLL_BUDGET_MS) {
           console.warn(`[Frontend] ⏳ Budget agotado (${Math.round(elapsed / 1000)} s). Job: ${jobId}`)
@@ -567,6 +578,7 @@ export default function DashboardPage() {
             onDeleteQuery={handleDeleteQuery}
             isTimedOut={isTimedOut}
             onManualCheck={handleManualCheck}
+            jobProgress={jobProgress}
           />
         </div>
       </main>

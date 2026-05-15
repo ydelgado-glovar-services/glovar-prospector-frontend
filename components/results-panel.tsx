@@ -62,7 +62,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/components/ui/use-toast"
 import { useIntegrations } from "@/components/integrations-provider"
-import type { ProspectRequest, ProspectResult, SavedQuery } from "@/lib/types"
+import type { ProspectRequest, ProspectResult, SavedQuery, JobProgress } from "@/lib/types"
 
 interface ResultsPanelProps {
   results: ProspectResult[]
@@ -78,6 +78,8 @@ interface ResultsPanelProps {
   isTimedOut?: boolean
   /** Called when the user clicks "Seguir esperando" or "Cargar resultados" */
   onManualCheck?: () => void
+  /** Granular progress data from the backend job */
+  jobProgress?: JobProgress
 }
 
 export function ResultsPanel({
@@ -92,6 +94,7 @@ export function ResultsPanel({
   onDeleteQuery,
   isTimedOut = false,
   onManualCheck,
+  jobProgress,
 }: ResultsPanelProps) {
   const [activeTab, setActiveTab] = useState("actual")
 
@@ -135,7 +138,7 @@ export function ResultsPanel({
             {isTimedOut ? (
               <TimeoutState onManualCheck={onManualCheck} />
             ) : isLoading ? (
-              <LoadingState />
+              <LoadingState jobProgress={jobProgress} />
             ) : results.length === 0 ? (
               <EmptyState hasSearched={hasSearched} />
             ) : (
@@ -170,26 +173,64 @@ export function ResultsPanel({
 /*  Sub-componentes internos                                          */
 /* ------------------------------------------------------------------ */
 
-function LoadingState() {
+function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
+  const hasTotal = (jobProgress?.total ?? 0) > 0
+  const pct = hasTotal
+    ? Math.min(100, Math.round(((jobProgress?.processed ?? 0) / (jobProgress?.total ?? 1)) * 100))
+    : 0
+  const phase = jobProgress?.phase || "Ejecutando prospección..."
+
   return (
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-20 text-center"
+      className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-20 text-center"
     >
+      {/* Spinner */}
       <div className="relative flex h-16 w-16 items-center justify-center">
         <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" aria-hidden="true" />
         <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-border bg-card shadow-md">
           <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden="true" />
         </div>
       </div>
-      <div className="max-w-md space-y-2">
-        <p className="text-base font-medium text-foreground text-balance">
-          Ejecutando prospección autónoma...
-        </p>
-        <p className="text-xs text-muted-foreground text-pretty">
-          Extrayendo perfiles, analizando triggers de noticias y redactando mensajes altamente personalizados.
-        </p>
+
+      {/* Text */}
+      <div className="max-w-sm space-y-1 w-full">
+        <p className="text-base font-medium text-foreground">{phase}</p>
+        {hasTotal && (
+          <p className="text-xs text-muted-foreground">
+            {jobProgress!.processed} / {jobProgress!.total} leads procesados
+          </p>
+        )}
+        {!hasTotal && (
+          <p className="text-xs text-muted-foreground text-pretty">
+            Extrayendo perfiles, analizando triggers de noticias y redactando mensajes personalizados.
+          </p>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full max-w-xs space-y-1.5">
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-primary/15"
+          role="progressbar"
+          aria-valuenow={hasTotal ? pct : undefined}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          {hasTotal ? (
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${pct}%` }}
+            />
+          ) : (
+            // Indeterminate shimmer when total is unknown
+            <div className="h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
+          )}
+        </div>
+        {hasTotal && (
+          <p className="text-right text-[10px] font-mono text-muted-foreground">{pct}%</p>
+        )}
       </div>
     </div>
   )
@@ -242,24 +283,53 @@ function TimeoutState({ onManualCheck }: { onManualCheck?: () => void }) {
 }
 
 function EmptyState({ hasSearched }: { hasSearched: boolean }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-20 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted/50">
-        {hasSearched ? (
+  if (hasSearched) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-20 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted/50">
           <Inbox className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-        ) : (
-          <Search className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-        )}
+        </div>
+        <div className="max-w-md space-y-1">
+          <p className="text-base font-medium text-foreground">Sin leads encontrados</p>
+          <p className="text-xs text-muted-foreground text-pretty">
+            No se hallaron perfiles que coincidan con los filtros ingresados. Intenta ampliar los criterios de búsqueda.
+          </p>
+        </div>
       </div>
-      <div className="max-w-md space-y-1">
-        <p className="text-base font-medium text-foreground">
-          {hasSearched ? "Sin leads encontrados" : "Panel listo para prospectar"}
+    )
+  }
+
+  // Premium idle state — communicates the 3-step AI workflow
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-8 px-8 py-16 text-center">
+      <div className="space-y-2">
+        <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl border border-primary/20 bg-primary/5 shadow-sm">
+          <Search className="h-6 w-6 text-primary" aria-hidden="true" />
+        </div>
+        <p className="text-base font-semibold text-foreground">Panel listo para prospectar</p>
+        <p className="text-xs text-muted-foreground max-w-xs">
+          Configura los criterios en el formulario e inicia la búsqueda automática de leads.
         </p>
-        <p className="text-xs text-muted-foreground text-pretty">
-          {hasSearched
-            ? "No se hallaron perfiles que coincidan con los filtros ingresados. Intenta ampliar los criterios de búsqueda."
-            : "Configura tus parámetros en el formulario lateral e inicia la prospección para visualizar las métricas y listados."}
-        </p>
+      </div>
+
+      {/* 3-step workflow illustration */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-sm">
+        {[
+          { icon: Users, label: "LinkedIn", desc: "Extrae perfiles calificados" },
+          { icon: Loader2, label: "Análisis IA", desc: "Evalua y enriquece con Groq" },
+          { icon: Mail, label: "Mensajes", desc: "Redacta outreach personalizado" },
+        ].map(({ icon: Icon, label, desc }) => (
+          <div
+            key={label}
+            className="flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-card/60 p-3"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+            </div>
+            <p className="text-xs font-semibold text-foreground">{label}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -716,20 +786,35 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
 
     setSendingEmailId(lead.nombre_lead || "unknown")
     
-    const success = await sendEmail({
-      leadId: lead.id!,
-      subject: subject,
-      body: body
-    })
-
-    if (success) {
-      toast({
-        title: "Correo enviado exitosamente",
-        description: `El correo a ${lead.nombre_lead || 'el prospecto'} ha sido enviado.`,
+    try {
+      const success = await sendEmail({
+        leadId: lead.id!,
+        subject: subject,
+        body: body
       })
-    }
 
-    setSendingEmailId(null)
+      if (success) {
+        toast({
+          title: "Correo enviado exitosamente",
+          description: `El correo a ${lead.nombre_lead || 'el prospecto'} ha sido enviado.`,
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error al enviar correo",
+          description: `No se pudo enviar el correo a ${lead.nombre_lead || 'el prospecto'}. Verifica la conexión con Google.`,
+        })
+      }
+    } catch (err) {
+      console.error("[Frontend] Error enviando correo:", err)
+      toast({
+        variant: "destructive",
+        title: "Error de red",
+        description: "Ocurrió un error inesperado al intentar enviar el correo.",
+      })
+    } finally {
+      setSendingEmailId(null)
+    }
   }
 
   const filteredResults = useMemo(() => {
