@@ -152,7 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // Forzamos un signOut para limpiar cualquier cookie/token inválido
           // del almacenamiento del navegador antes de resetear el estado.
+          localStorage.clear()
+          sessionStorage.clear()
           await supabase.auth.signOut()
+          window.location.href = '/login' // Force a full browser redirect to purge memory
         } catch {
           // Si el signOut también falla (sin red), lo ignoramos y seguimos.
         }

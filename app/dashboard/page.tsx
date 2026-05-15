@@ -235,6 +235,10 @@ export default function DashboardPage() {
     setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
     try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
 
+    // ── Synchronization buffer ───────────────────────────────────────────────
+    // Allow React's reconciler to catch up before the next API fetch.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
     try {
       // [Error Boundary]: Pre-flight serialization check
       let bodyPayload;
