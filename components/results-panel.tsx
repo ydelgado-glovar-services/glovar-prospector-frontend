@@ -176,8 +176,15 @@ export function ResultsPanel({
 function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
   const processed = jobProgress?.processed ?? 0
   const total = jobProgress?.total ?? 0
-  const percent = total > 0 ? Math.round((processed / total) * 100) : 0
   const phase = jobProgress?.phase || "Ejecutando prospección..."
+
+  // ── Weighted progress: phase-aware stages ──
+  const percent: number = (() => {
+    if (phase === "Iniciando prospección") return 10
+    if (phase === "Extrayendo de LinkedIn") return 45
+    if (total > 0) return 60 + Math.round((processed / total) * 40)
+    return 0
+  })()
 
   return (
     <div
@@ -214,21 +221,21 @@ function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
           <div
             className="h-2 flex-1 overflow-hidden rounded-full bg-primary/15"
             role="progressbar"
-            aria-valuenow={total > 0 ? percent : undefined}
+            aria-valuenow={percent > 0 ? percent : undefined}
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            {total > 0 ? (
+            {percent > 0 ? (
               <div
                 className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
                 style={{ width: `${percent}%` }}
               />
             ) : (
-              // Indeterminate shimmer when total is unknown
+              // Indeterminate shimmer before any phase signal
               <div className="h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
             )}
           </div>
-          {total > 0 && (
+          {percent > 0 && (
             <span className="text-xs font-mono font-medium text-muted-foreground">{percent}%</span>
           )}
         </div>
@@ -544,9 +551,9 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
       </div>
 
       {/* Sección superior: Dashboard Visual */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-muted/20 border-b border-border/60">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-muted/20 border-b border-border/60 items-stretch">
         {/* KPIs Stat Cards */}
-        <div className="flex flex-col justify-between gap-3 md:col-span-1">
+        <div className="flex flex-col justify-between gap-3 md:col-span-1 h-full">
           <Card className="bg-card shadow-none border-border/60 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -603,12 +610,12 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
           </div>
         </div>
 
-        {/* Gráfico Torta — Sólido con porcentajes visibles */}
-        <div className="md:col-span-1 flex flex-col bg-card rounded-lg border border-border/60 p-2 h-[220px]">
+        {/* Gráfico Torta — sin tooltip en hover */}
+        <div className="md:col-span-1 flex flex-col bg-card rounded-lg border border-border/60 p-2 h-full min-h-[220px]">
           <span className="text-xs font-medium text-muted-foreground px-2 pt-1">
             Distribución de Leads
           </span>
-          <div className="w-full flex-1">
+          <div className="w-full flex-1 min-h-[180px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -624,29 +631,19 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
                     <Cell key={`cell-${index}`} fill={entry.color} stroke="hsl(var(--card))" strokeWidth={2} />
                   ))}
                 </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    color: "hsl(var(--foreground))",
-                  }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
-                  formatter={(value: number, name: string) => [`${value} leads`, name]}
-                />
+                {/* Tooltip removed intentionally — no hover info on donut slices */}
                 <Legend verticalAlign="bottom" height={28} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Embudo de Prospección — BarChart */}
-        <div className="md:col-span-1 flex flex-col bg-card rounded-lg border border-border/60 p-2 h-[220px]">
+        {/* Embudo de Prospección — BarChart sin tooltip */}
+        <div className="md:col-span-1 flex flex-col bg-card rounded-lg border border-border/60 p-2 h-full min-h-[220px]">
           <span className="text-xs font-medium text-muted-foreground px-2 pt-1">
             Embudo de Prospección
           </span>
-          <div className="w-full flex-1">
+          <div className="w-full flex-1 min-h-[180px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
@@ -659,17 +656,7 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                 <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    color: "hsl(var(--foreground))",
-                  }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
-                  formatter={(value: number) => [`${value} leads`]}
-                />
+                {/* Tooltip removed intentionally — values visible via LabelList */}
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {[
                     { fill: "#000000" },

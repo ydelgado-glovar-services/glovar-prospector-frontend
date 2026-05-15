@@ -61,30 +61,57 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
     if (!values.propuesta_valor?.trim()) newErrors.propuesta_valor = "Campo obligatorio"
 
     // ── Guardrail: máx 3 términos separados por coma en Cargo y Sector ──
-    if (_countTerms(values.cargo_decision) > MAX_CSV_TERMS) {
+    const cargoCount = _countTerms(values.cargo_decision)
+    const sectorCount = _countTerms(values.sector)
+
+    if (cargoCount > MAX_CSV_TERMS) {
       newErrors.cargo_decision = CSV_WARNING
     }
-    if (_countTerms(values.sector) > MAX_CSV_TERMS) {
+    if (sectorCount > MAX_CSV_TERMS) {
       newErrors.sector = CSV_WARNING
     }
-    
+
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors)
-      
+
+      // ── Determine the correct toast message based on error type ──
+      const hasCsvLimitError =
+        newErrors.cargo_decision === CSV_WARNING ||
+        newErrors.sector === CSV_WARNING
+      const hasMissingFields = Object.values(newErrors).some(
+        (msg) => msg === "Campo obligatorio"
+      )
+
+      if (hasCsvLimitError && !hasMissingFields) {
+        // Only limit violations — no missing required fields
+        toast({
+          variant: "destructive",
+          title: "Demasiados términos",
+          description: CSV_WARNING,
+        })
+      } else {
+        // Missing required fields (may also include limit violations)
+        toast({
+          variant: "destructive",
+          title: "Campos incompletos",
+          description: "Por favor completa los campos requeridos",
+        })
+      }
+
+      // ── Scroll to the first invalid field (safe, non-blocking) ──
       const firstErrorKey = Object.keys(newErrors)[0]
       setTimeout(() => {
-        const errorElement = document.getElementById(firstErrorKey)
-        if (errorElement) {
-          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        try {
+          const errorElement = document.getElementById(firstErrorKey)
+          if (errorElement) {
+            errorElement.scrollIntoView({ behavior: "smooth", block: "center" })
+            errorElement.focus({ preventScroll: true })
+          }
+        } catch {
+          // DOM element not found — toast already fired above, so user is informed
         }
       }, 50)
 
-      toast({
-        variant: "destructive",
-        title: "Campos incompletos",
-        description: "Por favor, corrige los campos resaltados en rojo para continuar.",
-      })
-      
       return
     }
     
