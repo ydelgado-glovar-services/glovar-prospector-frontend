@@ -341,6 +341,23 @@ export default function DashboardPage() {
           console.log(`[Frontend] ✅ Job completado (${Math.round(elapsed / 1000)} s): ${jobId}`)
           const leads: ProspectResult[] = data.result?.leads ?? []
           try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
+
+          // ── Safety net: backend returned "completed" but 0 leads (should now be "error", but guard anyway) ──
+          if (leads.length === 0) {
+            setResults([])
+            setHasSearched(true)
+            setIsLoading(false)
+            setIsTimedOut(false)
+            setTimedOutJobId(null)
+            setJobProgress({ phase: "", processed: 0, total: 0 })
+            toast({
+              variant: "destructive",
+              title: "⚠️ No se encontraron leads",
+              description: "No se encontraron leads. Intenta ampliar tus criterios de búsqueda o verifica el scraper.",
+            })
+            return
+          }
+
           setResults(leads)
           setHasSearched(true)
           setIsLoading(false)
@@ -351,6 +368,24 @@ export default function DashboardPage() {
             title: "✅ Prospección completada",
             description: `Se encontraron ${leads.length} leads.`,
           })
+          return
+        }
+
+        if (data.status === "error") {
+          // ── Explicit zero-profile termination from the backend ──
+          console.warn(`[Frontend] ⚠️ Job terminó con 0 perfiles (cookie/match): ${jobId}`, data.error)
+          try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
+          toast({
+            variant: "destructive",
+            title: "⚠️ No se encontraron leads",
+            description: data.error ?? "No se encontraron leads. Intenta ampliar tus criterios de búsqueda o verifica el scraper.",
+          })
+          setResults([])
+          setHasSearched(true)
+          setIsLoading(false)
+          setIsTimedOut(false)
+          setTimedOutJobId(null)
+          setJobProgress({ phase: "", processed: 0, total: 0 })
           return
         }
 

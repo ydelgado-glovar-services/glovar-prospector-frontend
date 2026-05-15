@@ -216,27 +216,26 @@ function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full max-w-xs space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <div
-            className="h-2 flex-1 overflow-hidden rounded-full bg-primary/15"
-            role="progressbar"
-            aria-valuenow={percent > 0 ? percent : undefined}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            {percent > 0 ? (
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-                style={{ width: `${percent}%` }}
-              />
-            ) : (
-              // Indeterminate shimmer before any phase signal
-              <div className="h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
-            )}
-          </div>
-          {percent > 0 && (
-            <span className="text-xs font-mono font-medium text-muted-foreground">{percent}%</span>
+      <div className="w-full max-w-sm space-y-2">
+        <div className="flex items-center justify-between text-sm font-medium">
+          <span className="text-muted-foreground">{total > 0 ? "Procesando..." : "Iniciando..."}</span>
+          <span className="text-primary">{percent}%</span>
+        </div>
+        <div
+          className="relative w-full h-4 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
+          role="progressbar"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          {percent > 0 ? (
+            <div
+              className="absolute top-0 left-0 h-full rounded-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${percent}%` }}
+            />
+          ) : (
+            // Indeterminate shimmer before any phase signal
+            <div className="absolute top-0 left-0 h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
           )}
         </div>
       </div>
