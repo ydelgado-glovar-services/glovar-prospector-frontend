@@ -89,17 +89,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true
 
-    // Inicializar la sesión de forma robusta
+    // ── Helper: getSession() con timeout estricto ──────────────────────────
+    // getSession() nunca lanza, pero puede colgar silenciosamente si el token
+    // está corrompido. El race garantiza que la carga siempre termina.
+    const SESSION_TIMEOUT_MS = 5_000
+    const getSessionWithTimeout = () =>
+      Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("[Auth] getSession() excedió el tiempo límite (5s). Token posiblemente corrompido.")),
+            SESSION_TIMEOUT_MS
+          )
+        ),
+      ])
+
+    // ── Inicializar sesión de forma auto-resiliente ────────────────────────
     const initSession = async () => {
       try {
         setIsLoading(true)
         const {
           data: { session: currentSession },
           error,
-        } = await supabase.auth.getSession()
+        } = await getSessionWithTimeout()
 
         if (error) {
           throw error
+        }
+
+        // ── Detección de token vencido ───────────────────────────────────
+        // getSession() puede devolver una sesión con expires_at en el pasado
+        // sin lanzar error. La detectamos y hacemos auto-signOut para liberar
+        // las cookies corruptas antes de enviar al usuario a /login.
+        const isExpired =
+          currentSession?.expires_at != null &&
+          currentSession.expires_at * 1000 < Date.now()
+
+        if (isExpired) {
+          console.warn("[Auth] Sesión con token vencido detectada. Limpiando automáticamente...")
+          await supabase.auth.signOut()
+          if (isMounted) {
+            setSession(null)
+            setUser(null)
+            setRole(null)
+          }
+          return
         }
 
         if (isMounted) {
@@ -113,18 +147,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
+        // ── Auto-curación: limpiar token corrompido/timeout ─────────────
         console.error("[Auth] Error crítico al inicializar la sesión de Supabase:", err)
+        try {
+          // Forzamos un signOut para limpiar cualquier cookie/token inválido
+          // del almacenamiento del navegador antes de resetear el estado.
+          await supabase.auth.signOut()
+        } catch {
+          // Si el signOut también falla (sin red), lo ignoramos y seguimos.
+        }
         if (isMounted) {
           setSession(null)
           setUser(null)
-          setRole("client")
+          setRole(null)
         }
       } finally {
+        // ── Garantía absoluta: el loading SIEMPRE termina ───────────────
+        // Este bloque se ejecuta en todos los escenarios:
+        // sesión válida, token vencido, timeout, error de red.
         if (isMounted) {
           setIsLoading(false)
         }
       }
     }
+
 
     initSession()
 
