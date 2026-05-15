@@ -19,6 +19,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react"
 import { useRouter } from "next/navigation"
@@ -59,7 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
+  
+  // Inicializar Supabase memoizado para evitar recreaciones
+  const supabase = useMemo(() => createClient(), [])
 
   // Obtener el rol del usuario desde la tabla user_profiles
   const fetchRole = useCallback(
@@ -89,108 +92,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true
 
-    // ── Helper: getSession() con timeout estricto ──────────────────────────
-    // getSession() nunca lanza, pero puede colgar silenciosamente si el token
-    // está corrompido. El race garantiza que la carga siempre termina.
-    const SESSION_TIMEOUT_MS = 5_000
-    const getSessionWithTimeout = () =>
-      Promise.race([
-        supabase.auth.getSession(),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("[Auth] getSession() excedió el tiempo límite (5s). Token posiblemente corrompido.")),
-            SESSION_TIMEOUT_MS
-          )
-        ),
-      ])
-
-    // ── Inicializar sesión de forma auto-resiliente ────────────────────────
+    // ── Inicializar sesión sin retry/timeout ────────────────────────
     const initSession = async () => {
       try {
         setIsLoading(true)
-        const {
-          data: { session: currentSession },
-          error,
-        } = await getSessionWithTimeout()
+        const { data, error } = await supabase.auth.getSession()
 
         if (error) {
           throw error
         }
 
-        // ── Detección de token vencido ───────────────────────────────────
-        // getSession() puede devolver una sesión con expires_at en el pasado
-        // sin lanzar error. La detectamos y hacemos auto-signOut para liberar
-        // las cookies corruptas antes de enviar al usuario a /login.
-        const isExpired =
-          currentSession?.expires_at != null &&
-          currentSession.expires_at * 1000 < Date.now()
-
-        if (isExpired) {
-          console.warn("[Auth] Sesión con token vencido detectada. Limpiando automáticamente...")
-          await supabase.auth.signOut()
-          if (isMounted) {
-            setSession(null)
-            setUser(null)
-            setRole(null)
-          }
-          return
-        }
-
         if (isMounted) {
-          setSession(currentSession)
-          setUser(currentSession?.user ?? null)
+          setSession(data.session)
+          setUser(data.session?.user ?? null)
 
-          if (currentSession?.user) {
-            await fetchRole(currentSession.user.id)
+          if (data.session?.user) {
+            await fetchRole(data.session.user.id)
           } else {
             setRole(null)
           }
         }
       } catch (err) {
-        // ── Auto-curación: limpiar token corrompido/timeout ─────────────
-        console.error("[Auth] Error crítico al inicializar la sesión de Supabase:", err)
-        try {
-          // Forzamos un signOut para limpiar cualquier cookie/token inválido
-          // del almacenamiento del navegador antes de resetear el estado.
-          localStorage.clear()
-          sessionStorage.clear()
-          await supabase.auth.signOut()
-          window.location.href = '/login' // Force a full browser redirect to purge memory
-        } catch {
-          // Si el signOut también falla (sin red), lo ignoramos y seguimos.
-        }
+        console.error("[Auth] Error inicial al obtener sesión. Limpiando estado.", err)
         if (isMounted) {
           setSession(null)
           setUser(null)
           setRole(null)
         }
       } finally {
-        // ── Garantía absoluta: el loading SIEMPRE termina ───────────────
-        // Este bloque se ejecuta en todos los escenarios:
-        // sesión válida, token vencido, timeout, error de red.
         if (isMounted) {
           setIsLoading(false)
         }
       }
     }
 
-
     initSession()
 
     // Escuchar cambios de estado en la autenticación de Supabase
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return
 
       try {
-        setSession(newSession)
-        setUser(newSession?.user ?? null)
-
-        if (newSession?.user) {
-          await fetchRole(newSession.user.id)
-        } else {
+        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+          setSession(null)
+          setUser(null)
           setRole(null)
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          setSession(newSession)
+          setUser(newSession?.user ?? null)
+
+          if (newSession?.user) {
+            await fetchRole(newSession.user.id)
+          } else {
+            setRole(null)
+          }
         }
 
         // Forzar la recarga del enrutador para reevaluar middlewares de protección

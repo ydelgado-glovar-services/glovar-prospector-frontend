@@ -58,6 +58,7 @@ export default function DashboardPage() {
   const [hasSearched, setHasSearched] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
   const [activeQueryId, setActiveQueryId] = useState<string | null>(null)
+  const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now())
 
   // Timeout-fallback state — shown when polling exhausts its budget
   const [isTimedOut, setIsTimedOut] = useState(false)
@@ -203,6 +204,7 @@ export default function DashboardPage() {
     setActiveQueryId(null)
     setResults([])
     setHasSearched(false)
+    setSearchTimestamp(Date.now())
   }
 
   // ── UPDATED: fetch explícitamente refresca y verifica la sesión y el token ──
@@ -233,6 +235,7 @@ export default function DashboardPage() {
     setIsTimedOut(false)
     setTimedOutJobId(null)
     setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+    setSearchTimestamp(Date.now())
     try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
 
     // ── Synchronization buffer ───────────────────────────────────────────────
@@ -613,6 +616,7 @@ export default function DashboardPage() {
             onClear={handleClear}
           />
           <ResultsPanel
+            key={searchTimestamp}
             results={results}
             isLoading={isLoading}
             hasSearched={hasSearched}
