@@ -896,6 +896,9 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
               <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Link
               </TableHead>
+              <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Fuente
+              </TableHead>
               <TableHead className="w-[160px] text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Contacto
               </TableHead>
@@ -977,6 +980,22 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                         className="inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-4 hover:underline"
                       >
                         <span>Perfil</span>
+                        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {result.url_noticia ? (
+                      <a
+                        href={result.url_noticia}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={result.url_noticia}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-amber-500 hover:text-amber-400 underline-offset-4 hover:underline transition-colors"
+                      >
+                        <span>Noticia</span>
                         <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
                       </a>
                     ) : (

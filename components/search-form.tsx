@@ -237,7 +237,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
             <Textarea
               id="dolor_cliente"
               name="dolor_cliente"
-              placeholder="Describe el problema concreto que tu producto resuelve para este perfil..."
+              placeholder="Ej: Empresas extranjeras pierden cadena de frío al entrar a Colombia sin un partner especializado."
               value={values.dolor_cliente}
               onChange={(event) => handleFieldChange({ dolor_cliente: event.target.value })}
               disabled={isLoading}
@@ -258,7 +258,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
             <Textarea
               id="propuesta_valor"
               name="propuesta_valor"
-              placeholder="Resultado tangible que entregas (ej: reducir 30% el churn en 90 días)..."
+              placeholder="Ej: Operador 3PL exclusivo en salud con certificaciones INVIMA y entregas < 24h."
               value={values.propuesta_valor}
               onChange={(event) => handleFieldChange({ propuesta_valor: event.target.value })}
               disabled={isLoading}
@@ -285,12 +285,16 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
                   <Textarea
                     id="triggers_compra"
                     name="triggers_compra"
-                    placeholder="Ej: apertura de operaciones, quejas de clientes"
+                    placeholder="Ej: Expansión a Colombia"
                     value={values.triggers_compra || ""}
                     onChange={(event) => handleFieldChange({ triggers_compra: event.target.value })}
                     disabled={isLoading}
                     rows={2}
+                    maxLength={150}
                   />
+                  <span className="text-[10px] text-muted-foreground mt-0.5">
+                    Breve. Se usará para buscar noticias. (Máx. 150 caracteres — {(values.triggers_compra || "").length}/150)
+                  </span>
                 </div>
                 
                 <div className="flex flex-col gap-2">
@@ -315,7 +319,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
                   <Textarea
                     id="keywords_industria"
                     name="keywords_industria"
-                    placeholder="Ej: cold chain excursion, SLAs"
+                    placeholder="Ej: cold chain excursion, INVIMA compliance..."
                     value={values.keywords_industria || ""}
                     onChange={(event) => handleFieldChange({ keywords_industria: event.target.value })}
                     disabled={isLoading}

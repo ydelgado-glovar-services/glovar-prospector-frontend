@@ -30,6 +30,7 @@ export interface ProspectResult {
   guardado_en_db: boolean
   email?: string
   telefono?: string
+  url_noticia?: string | null
 }
 
 export interface SavedQuery {
