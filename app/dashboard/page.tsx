@@ -364,6 +364,10 @@ export default function DashboardPage() {
             setIsTimedOut(false)
             setTimedOutJobId(null)
             setJobProgress({ phase: "", processed: 0, total: 0 })
+            if (pollingTimerRef.current) {
+              clearTimeout(pollingTimerRef.current)
+              pollingTimerRef.current = null
+            }
             toast({
               variant: "destructive",
               title: "⚠️ No se encontraron leads",
@@ -378,6 +382,10 @@ export default function DashboardPage() {
           setIsTimedOut(false)
           setTimedOutJobId(null)
           setJobProgress({ phase: "Completado", processed: data.processed_leads ?? leads.length, total: data.total_leads ?? leads.length })
+          if (pollingTimerRef.current) {
+            clearTimeout(pollingTimerRef.current)
+            pollingTimerRef.current = null
+          }
           toast({
             title: "✅ Prospección completada",
             description: `Se encontraron ${leads.length} leads.`,
@@ -400,6 +408,10 @@ export default function DashboardPage() {
           setIsTimedOut(false)
           setTimedOutJobId(null)
           setJobProgress({ phase: "", processed: 0, total: 0 })
+          if (pollingTimerRef.current) {
+            clearTimeout(pollingTimerRef.current)
+            pollingTimerRef.current = null
+          }
           return
         }
 
@@ -417,6 +429,10 @@ export default function DashboardPage() {
           setIsTimedOut(false)
           setTimedOutJobId(null)
           setJobProgress({ phase: "", processed: 0, total: 0 })
+          if (pollingTimerRef.current) {
+            clearTimeout(pollingTimerRef.current)
+            pollingTimerRef.current = null
+          }
           return
         }
 
@@ -434,6 +450,10 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(true)
           setTimedOutJobId(jobId)
+          if (pollingTimerRef.current) {
+            clearTimeout(pollingTimerRef.current)
+            pollingTimerRef.current = null
+          }
           toast({
             title: "⏳ El backend sigue trabajando",
             description: "Puedes seguir esperando o cargar los resultados manualmente.",
