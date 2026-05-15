@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { useToast } from "@/hooks/use-toast"
+
 import type { CompanySize, ProspectRequest } from "@/lib/types"
 
 interface SearchFormProps {
@@ -24,7 +24,6 @@ interface SearchFormProps {
 
 export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: SearchFormProps) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const { toast } = useToast()
 
   /** Cuenta términos separados por coma (ignora espacios vacíos). */
   const _countTerms = (value: string | undefined): number => {
@@ -74,30 +73,6 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors)
 
-      // ── Determine the correct toast message based on error type ──
-      const hasCsvLimitError =
-        newErrors.cargo_decision === CSV_WARNING ||
-        newErrors.sector === CSV_WARNING
-      const hasMissingFields = Object.values(newErrors).some(
-        (msg) => msg === "Campo obligatorio"
-      )
-
-      if (hasCsvLimitError && !hasMissingFields) {
-        // Only limit violations — no missing required fields
-        toast({
-          variant: "destructive",
-          title: "Demasiados términos",
-          description: CSV_WARNING,
-        })
-      } else {
-        // Missing required fields (may also include limit violations)
-        toast({
-          variant: "destructive",
-          title: "Campos incompletos",
-          description: "Por favor completa los campos requeridos",
-        })
-      }
-
       // ── Scroll to the first invalid field (safe, non-blocking) ──
       const firstErrorKey = Object.keys(newErrors)[0]
       setTimeout(() => {
@@ -108,7 +83,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
             errorElement.focus({ preventScroll: true })
           }
         } catch {
-          // DOM element not found — toast already fired above, so user is informed
+          // Silently ignore if the DOM element is not found
         }
       }, 50)
 

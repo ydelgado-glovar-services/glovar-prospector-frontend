@@ -221,12 +221,19 @@ export default function DashboardPage() {
       return
     }
 
-    setIsLoading(true)
-    setResults([])
-
+    // ── Atomic reset of ALL previous-job state ───────────────────────────────
+    // This MUST run synchronously before any async work so the UI reacts
+    // immediately: the progress bar drops to 0% and no stale 100% state lingers.
     if (pollingTimerRef.current) {
       clearTimeout(pollingTimerRef.current)
+      pollingTimerRef.current = null
     }
+    setIsLoading(true)
+    setResults([])
+    setIsTimedOut(false)
+    setTimedOutJobId(null)
+    setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+    try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
 
     try {
       // [Error Boundary]: Pre-flight serialization check
