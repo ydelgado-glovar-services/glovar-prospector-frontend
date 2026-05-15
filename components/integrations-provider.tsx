@@ -10,6 +10,7 @@ import {
 } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
+import { apiFetch } from "@/lib/api"
 
 interface IntegrationsContextValue {
   isConnected: boolean
@@ -47,10 +48,8 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/status`, {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
+      const res = await apiFetch("/api/v1/auth/google/status", {
+        token: session.access_token,
       })
       if (res.ok) {
         const data = await res.json()
@@ -90,12 +89,9 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/send-email`, {
+      const res = await apiFetch("/api/v1/auth/google/send-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
+        token: session.access_token,
         body: JSON.stringify({ lead_id: leadId, subject, body }),
       })
 

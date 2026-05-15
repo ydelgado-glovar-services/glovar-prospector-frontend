@@ -15,6 +15,7 @@ import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google"
 import { useAuth } from "@/components/auth-provider"
 import { useIntegrations } from "@/components/integrations-provider"
 import { useToast } from "@/components/ui/use-toast"
+import { apiFetch } from "@/lib/api"
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
 
@@ -30,12 +31,9 @@ function GmailConnectButton() {
     onSuccess: async (codeResponse) => {
       try {
         setIsLoading(true)
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/callback`, {
+        const res = await apiFetch("/api/v1/auth/google/callback", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token}`
-          },
+          token: session?.access_token,
           body: JSON.stringify({ code: codeResponse.code }),
         })
 

@@ -24,6 +24,15 @@ interface SearchFormProps {
 export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: SearchFormProps) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
+  /** Cuenta términos separados por coma (ignora espacios vacíos). */
+  const _countTerms = (value: string | undefined): number => {
+    if (!value) return 0
+    return value.split(",").filter((t) => t.trim()).length
+  }
+
+  const MAX_CSV_TERMS = 3
+  const CSV_WARNING = "Máximo 3 términos recomendados para evitar errores de búsqueda"
+
   const handleFieldChange = (patch: Partial<ProspectRequest>) => {
     onChange(patch)
     const key = Object.keys(patch)[0]
@@ -48,6 +57,14 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
     if (!values.cargo_decision?.trim()) newErrors.cargo_decision = "Campo obligatorio"
     if (!values.dolor_cliente?.trim()) newErrors.dolor_cliente = "Campo obligatorio"
     if (!values.propuesta_valor?.trim()) newErrors.propuesta_valor = "Campo obligatorio"
+
+    // ── Guardrail: máx 3 términos separados por coma en Cargo y Sector ──
+    if (_countTerms(values.cargo_decision) > MAX_CSV_TERMS) {
+      newErrors.cargo_decision = CSV_WARNING
+    }
+    if (_countTerms(values.sector) > MAX_CSV_TERMS) {
+      newErrors.sector = CSV_WARNING
+    }
     
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors)
@@ -96,15 +113,22 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
               <Input
                 id="sector"
                 name="sector"
-                placeholder="Ej: Salud"
+                placeholder="Ej: Salud, Finanzas, Tecnología"
                 value={values.sector}
                 onChange={(event) => handleFieldChange({ sector: event.target.value })}
                 disabled={isLoading}
                 className={formErrors.sector ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
               {formErrors.sector && (
-                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                <span className={`text-xs flex items-center gap-1 mt-1 ${
+                  formErrors.sector === CSV_WARNING ? "text-amber-500" : "text-red-500"
+                }`}>
                   <AlertCircle className="w-3 h-3" /> {formErrors.sector}
+                </span>
+              )}
+              {!formErrors.sector && _countTerms(values.sector) > 0 && (
+                <span className="text-[10px] text-muted-foreground mt-0.5">
+                  {_countTerms(values.sector)}/{MAX_CSV_TERMS} términos
                 </span>
               )}
             </div>
@@ -165,15 +189,22 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
               <Input
                 id="cargo"
                 name="cargo"
-                placeholder="Ej: CEO"
+                placeholder="Ej: CEO, CTO, VP Ventas"
                 value={values.cargo_decision}
                 onChange={(event) => handleFieldChange({ cargo_decision: event.target.value })}
                 disabled={isLoading}
                 className={formErrors.cargo_decision ? "border-red-500 focus-visible:ring-red-500" : ""}
               />
               {formErrors.cargo_decision && (
-                <span className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                <span className={`text-xs flex items-center gap-1 mt-1 ${
+                  formErrors.cargo_decision === CSV_WARNING ? "text-amber-500" : "text-red-500"
+                }`}>
                   <AlertCircle className="w-3 h-3" /> {formErrors.cargo_decision}
+                </span>
+              )}
+              {!formErrors.cargo_decision && _countTerms(values.cargo_decision) > 0 && (
+                <span className="text-[10px] text-muted-foreground mt-0.5">
+                  {_countTerms(values.cargo_decision)}/{MAX_CSV_TERMS} términos
                 </span>
               )}
             </div>

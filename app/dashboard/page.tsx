@@ -17,6 +17,7 @@ import { SearchForm } from "@/components/search-form"
 import { useAuth } from "@/components/auth-provider"
 import { createClient } from "@/lib/supabase"
 import type { ProspectRequest, ProspectResult, SavedQuery } from "@/lib/types"
+import { apiFetch } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 const INITIAL_FORM: ProspectRequest = {
@@ -131,11 +132,8 @@ export default function DashboardPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries`, {
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-          "ngrok-skip-browser-warning": "69420"
-        },
+      const response = await apiFetch("/api/v1/queries", {
+        token: currentSession.access_token,
       })
 
       if (response.status === 401) {
@@ -257,12 +255,9 @@ export default function DashboardPage() {
       )
       console.log("[Frontend] Enviando solicitud de prospección (autenticada):", form)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/prospect`, {
+      const response = await apiFetch("/api/v1/prospect", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
+        token: accessToken,
         body: bodyPayload,
       })
 
@@ -321,12 +316,8 @@ export default function DashboardPage() {
 
     const checkStatus = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/prospect/job/${jobId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "ngrok-skip-browser-warning": "69420",
-            "Content-Type": "application/json"
-          },
+        const response = await apiFetch(`/api/v1/prospect/job/${jobId}`, {
+          token: accessToken,
         })
 
         if (response.status === 401) {
@@ -429,11 +420,8 @@ export default function DashboardPage() {
     toast({ title: "Consultando resultados...", description: "Revisando el estado del job en el backend." })
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/prospect/job/${timedOutJobId}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "ngrok-skip-browser-warning": "69420"
-        },
+      const response = await apiFetch(`/api/v1/prospect/job/${timedOutJobId}`, {
+        token: session.access_token,
       })
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -473,23 +461,15 @@ export default function DashboardPage() {
     try {
       let response;
       if (isOverwrite && existingId) {
-        response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries/${existingId}`, {
+        response = await apiFetch(`/api/v1/queries/${existingId}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            "ngrok-skip-browser-warning": "69420"
-          },
+          token: session.access_token,
           body: JSON.stringify({ query_name: name, search_params: form }),
         })
       } else {
-        response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries`, {
+        response = await apiFetch("/api/v1/queries", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            "ngrok-skip-browser-warning": "69420"
-          },
+          token: session.access_token,
           body: JSON.stringify({ query_name: name, search_params: form }),
         })
       }
@@ -529,12 +509,9 @@ export default function DashboardPage() {
   const handleDeleteQuery = async (id: string) => {
     if (!session) return
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/queries/${id}`, {
+      const response = await apiFetch(`/api/v1/queries/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "ngrok-skip-browser-warning": "69420"
-        },
+        token: session.access_token,
       })
       if (response.ok) {
         toast({
