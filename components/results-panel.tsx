@@ -174,10 +174,9 @@ export function ResultsPanel({
 /* ------------------------------------------------------------------ */
 
 function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
-  const hasTotal = (jobProgress?.total ?? 0) > 0
-  const pct = hasTotal
-    ? Math.min(100, Math.round(((jobProgress?.processed ?? 0) / (jobProgress?.total ?? 1)) * 100))
-    : 0
+  const processed = jobProgress?.processed ?? 0
+  const total = jobProgress?.total ?? 0
+  const percent = total > 0 ? Math.round((processed / total) * 100) : 0
   const phase = jobProgress?.phase || "Ejecutando prospección..."
 
   return (
@@ -197,12 +196,12 @@ function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
       {/* Text */}
       <div className="max-w-sm space-y-1 w-full">
         <p className="text-base font-medium text-foreground">{phase}</p>
-        {hasTotal && (
+        {total > 0 && (
           <p className="text-xs text-muted-foreground">
-            {jobProgress!.processed} / {jobProgress!.total} leads procesados
+            {processed} / {total} leads procesados
           </p>
         )}
-        {!hasTotal && (
+        {!total && (
           <p className="text-xs text-muted-foreground text-pretty">
             Extrayendo perfiles, analizando triggers de noticias y redactando mensajes personalizados.
           </p>
@@ -211,26 +210,28 @@ function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
 
       {/* Progress bar */}
       <div className="w-full max-w-xs space-y-1.5">
-        <div
-          className="h-2 w-full overflow-hidden rounded-full bg-primary/15"
-          role="progressbar"
-          aria-valuenow={hasTotal ? pct : undefined}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          {hasTotal ? (
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          ) : (
-            // Indeterminate shimmer when total is unknown
-            <div className="h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className="h-2 flex-1 overflow-hidden rounded-full bg-primary/15"
+            role="progressbar"
+            aria-valuenow={total > 0 ? percent : undefined}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            {total > 0 ? (
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                style={{ width: `${percent}%` }}
+              />
+            ) : (
+              // Indeterminate shimmer when total is unknown
+              <div className="h-full w-1/3 rounded-full bg-primary animate-[shimmer_1.5s_ease-in-out_infinite]" />
+            )}
+          </div>
+          {total > 0 && (
+            <span className="text-xs font-mono font-medium text-muted-foreground">{percent}%</span>
           )}
         </div>
-        {hasTotal && (
-          <p className="text-right text-[10px] font-mono text-muted-foreground">{pct}%</p>
-        )}
       </div>
     </div>
   )

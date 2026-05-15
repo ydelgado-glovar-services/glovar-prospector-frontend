@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useToast } from "@/hooks/use-toast"
 import type { CompanySize, ProspectRequest } from "@/lib/types"
 
 interface SearchFormProps {
@@ -23,6 +24,7 @@ interface SearchFormProps {
 
 export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: SearchFormProps) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const { toast } = useToast()
 
   /** Cuenta términos separados por coma (ignora espacios vacíos). */
   const _countTerms = (value: string | undefined): number => {
@@ -68,6 +70,21 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
     
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors)
+      
+      const firstErrorKey = Object.keys(newErrors)[0]
+      setTimeout(() => {
+        const errorElement = document.getElementById(firstErrorKey)
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 50)
+
+      toast({
+        variant: "destructive",
+        title: "Campos incompletos",
+        description: "Por favor, corrige los campos resaltados en rojo para continuar.",
+      })
+      
       return
     }
     
@@ -154,16 +171,17 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="tamano" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="tamano_empresa" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Tamaño de empresa
               </Label>
               <Select
+                name="tamano_empresa"
                 value={values.tamano_empresa || undefined}
                 onValueChange={(value) => handleFieldChange({ tamano_empresa: value as CompanySize })}
                 disabled={isLoading}
               >
                 <SelectTrigger 
-                  id="tamano" 
+                  id="tamano_empresa" 
                   className={`w-full ${formErrors.tamano_empresa ? "border-red-500 focus:ring-red-500" : ""}`}
                 >
                   <SelectValue placeholder="Selecciona un rango" />
@@ -183,12 +201,12 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="cargo" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="cargo_decision" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Cargo del tomador de decisión
               </Label>
               <Input
-                id="cargo"
-                name="cargo"
+                id="cargo_decision"
+                name="cargo_decision"
                 placeholder="Ej: CEO, CTO, VP Ventas"
                 value={values.cargo_decision}
                 onChange={(event) => handleFieldChange({ cargo_decision: event.target.value })}
@@ -211,12 +229,12 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="dolor" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Label htmlFor="dolor_cliente" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Dolor del cliente a resolver
             </Label>
             <Textarea
-              id="dolor"
-              name="dolor"
+              id="dolor_cliente"
+              name="dolor_cliente"
               placeholder="Describe el problema concreto que tu producto resuelve para este perfil..."
               value={values.dolor_cliente}
               onChange={(event) => handleFieldChange({ dolor_cliente: event.target.value })}
@@ -232,12 +250,12 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="propuesta" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Label htmlFor="propuesta_valor" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Propuesta de valor / Resultado
             </Label>
             <Textarea
-              id="propuesta"
-              name="propuesta"
+              id="propuesta_valor"
+              name="propuesta_valor"
               placeholder="Resultado tangible que entregas (ej: reducir 30% el churn en 90 días)..."
               value={values.propuesta_valor}
               onChange={(event) => handleFieldChange({ propuesta_valor: event.target.value })}
@@ -308,7 +326,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
 
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <Label htmlFor="limite" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Label htmlFor="limite_perfiles" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Límite de perfiles a analizar
               </Label>
               <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-sm font-bold font-mono text-primary">
@@ -316,7 +334,8 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
               </span>
             </div>
             <Slider
-              id="limite"
+              id="limite_perfiles"
+              name="limite_perfiles"
               min={5}
               max={30}
               step={1}
