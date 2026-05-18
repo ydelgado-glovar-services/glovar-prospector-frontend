@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
+type RouteContext = { params: Promise<{ slug?: string[] }> | { slug?: string[] } }
+
 // Reusable handler for all methods
-async function handleRequest(request: NextRequest, { params }: { params: { slug: string[] } }) {
+async function handleRequest(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient()
 
@@ -16,9 +18,14 @@ async function handleRequest(request: NextRequest, { params }: { params: { slug:
       )
     }
 
+    // Safely unwrap the params object (handles both Promise and direct object)
+    const resolvedParams = await context.params;
+    const slugArray = resolvedParams?.slug || [];
+    const path = slugArray.join('/');
+
     // Reconstruct the target FastAPI URL dynamically
     const backendUrl = process.env.PYTHON_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-    const endpoint = `${backendUrl}/api/v1/${params.slug.join('/')}${request.nextUrl.search}`
+    const endpoint = `${backendUrl}/api/v1/${path}${request.nextUrl.search}`
 
     // Prepare headers
     const headers = new Headers(request.headers)
@@ -80,22 +87,22 @@ async function handleRequest(request: NextRequest, { params }: { params: { slug:
   }
 }
 
-export async function GET(request: NextRequest, context: { params: { slug: string[] } }) {
+export async function GET(request: NextRequest, context: RouteContext) {
   return handleRequest(request, context)
 }
 
-export async function POST(request: NextRequest, context: { params: { slug: string[] } }) {
+export async function POST(request: NextRequest, context: RouteContext) {
   return handleRequest(request, context)
 }
 
-export async function PUT(request: NextRequest, context: { params: { slug: string[] } }) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   return handleRequest(request, context)
 }
 
-export async function PATCH(request: NextRequest, context: { params: { slug: string[] } }) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   return handleRequest(request, context)
 }
 
-export async function DELETE(request: NextRequest, context: { params: { slug: string[] } }) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   return handleRequest(request, context)
 }
