@@ -51,6 +51,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  const isSessionReady = !authLoading && !!session
+
   const [form, setForm] = useState<ProspectRequest>(INITIAL_FORM)
   const [results, setResults] = useState<ProspectResult[]>([])
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([])
@@ -653,6 +655,7 @@ export default function DashboardPage() {
           <SearchForm
             values={form}
             isLoading={isLoading}
+            isSessionReady={isSessionReady}
             onChange={handleChange}
             onSubmit={handleSubmit}
             onClear={handleClear}

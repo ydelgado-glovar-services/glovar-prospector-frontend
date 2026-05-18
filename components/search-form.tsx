@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react"
 import { Loader2, Play, AlertCircle } from "lucide-react"
 
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,13 +18,15 @@ import type { CompanySize, ProspectRequest } from "@/lib/types"
 interface SearchFormProps {
   values: ProspectRequest
   isLoading: boolean
+  isSessionReady?: boolean
   onChange: (patch: Partial<ProspectRequest>) => void
   onSubmit: () => void
   onClear?: () => void
 }
 
-export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: SearchFormProps) {
+export function SearchForm({ values, isLoading, isSessionReady = true, onChange, onSubmit, onClear }: SearchFormProps) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const { toast } = useToast()
 
   /** Cuenta términos separados por coma (ignora espacios vacíos). */
   const _countTerms = (value: string | undefined): number => {
@@ -50,6 +53,16 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
     event.preventDefault()
     
     try {
+      if (!isSessionReady) {
+        console.error("[Frontend] handleSubmit triggered without a valid session.")
+        toast({
+          variant: "destructive",
+          title: "Sesión no válida",
+          description: "La sesión aún no se ha cargado. Por favor, espera un momento o vuelve a iniciar sesión.",
+        })
+        return
+      }
+
       const newErrors: Record<string, string> = {}
       
       if (!values.mi_empresa?.trim()) newErrors.mi_empresa = "Campo obligatorio"
@@ -365,7 +378,7 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
               type="submit"
               size="lg"
               className="w-full font-medium"
-              disabled={isLoading}
+              disabled={isLoading || !isSessionReady}
               aria-busy={isLoading}
             >
               {isLoading ? (

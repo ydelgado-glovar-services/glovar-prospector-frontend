@@ -56,18 +56,11 @@ async function handleRequest(request: NextRequest, context: RouteContext) {
 
     const response = await fetch(targetUrl, requestInit)
 
-    // Handle response gracefully
-    const contentType = response.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      const data = await response.json()
-      return NextResponse.json(data, { status: response.status })
-    } else {
-      const data = await response.text()
-      return new NextResponse(data, { 
-        status: response.status, 
-        headers: { 'Content-Type': contentType || 'text/plain' } 
-      })
-    }
+    // Directly stream the backend response back to the client
+    return new Response(response.body, {
+      status: response.status,
+      headers: response.headers
+    });
 
   } catch (err: any) {
     // 5. Error Tracing
