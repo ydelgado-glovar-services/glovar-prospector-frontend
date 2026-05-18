@@ -15,7 +15,7 @@ import { AppHeader } from "@/components/app-header"
 import { ResultsPanel } from "@/components/results-panel"
 import { SearchForm } from "@/components/search-form"
 import { useAuth } from "@/components/auth-provider"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/utils/supabase/client"
 import type { ProspectRequest, ProspectResult, SavedQuery, JobProgress } from "@/lib/types"
 import { apiFetch } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
@@ -209,109 +209,131 @@ export default function DashboardPage() {
 
   // ── UPDATED: fetch explícitamente refresca y verifica la sesión y el token ──
   const handleSubmit = async () => {
-    // [Safety Mechanism]: Validate form strictly before setting loading state
-    // Prevents trapping user in an infinite loading state if validation fails
-    const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
-
-    // Validate ONLY the required fields. We completely ignore advanced optional fields if empty.
-    if (!sector?.trim() || !pais?.trim() || !tamano_empresa?.trim() || !cargo_decision?.trim() || !dolor_cliente?.trim() || !propuesta_valor?.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Campos incompletos",
-        description: "Por favor, completa todos los campos requeridos del formulario.",
-      })
-      return
-    }
-
-    // ── Atomic reset of ALL previous-job state ───────────────────────────────
-    // This MUST run synchronously before any async work so the UI reacts
-    // immediately: the progress bar drops to 0% and no stale 100% state lingers.
-    if (pollingTimerRef.current) {
-      clearTimeout(pollingTimerRef.current)
-      pollingTimerRef.current = null
-    }
-    setIsLoading(true)
-    setResults([])
-    setIsTimedOut(false)
-    setTimedOutJobId(null)
-    setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
-    setSearchTimestamp(Date.now())
-    try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
-
-    // ── Synchronization buffer ───────────────────────────────────────────────
-    // Allow React's reconciler to catch up before the next API fetch.
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
     try {
-      // [Error Boundary]: Pre-flight serialization check
-      let bodyPayload;
+      // [Safety Mechanism]: Validate form strictly before setting loading state
+      // Prevents trapping user in an infinite loading state if validation fails
+      const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
+
+      // Validate ONLY the required fields. We completely ignore advanced optional fields if empty.
+      if (!sector?.trim() || !pais?.trim() || !tamano_empresa?.trim() || !cargo_decision?.trim() || !dolor_cliente?.trim() || !propuesta_valor?.trim()) {
+        try {
+          toast({
+            variant: "destructive",
+            title: "Campos incompletos",
+            description: "Por favor, completa todos los campos requeridos del formulario.",
+          })
+        } catch (e) {
+          console.error("[Frontend] Error showing incomplete fields toast:", e)
+        }
+        return
+      }
+
+      // ── Atomic reset of ALL previous-job state ───────────────────────────────
+      // This MUST run synchronously before any async work so the UI reacts
+      // immediately: the progress bar drops to 0% and no stale 100% state lingers.
+      if (pollingTimerRef.current) {
+        clearTimeout(pollingTimerRef.current)
+        pollingTimerRef.current = null
+      }
+      setIsLoading(true)
+      setResults([])
+      setIsTimedOut(false)
+      setTimedOutJobId(null)
+      setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+      setSearchTimestamp(Date.now())
+      try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
+
+      // ── Synchronization buffer ───────────────────────────────────────────────
+      // Allow React's reconciler to catch up before the next API fetch.
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
       try {
-        bodyPayload = JSON.stringify(form);
-      } catch (err) {
-        console.error("[Frontend] Error de serialización pre-flight:", err);
-        throw err;
-      }
+        // [Error Boundary]: Pre-flight serialization check
+        let bodyPayload;
+        try {
+          bodyPayload = JSON.stringify(form);
+        } catch (err) {
+          console.error("[Frontend] Error de serialización pre-flight:", err);
+          throw err;
+        }
 
-      // Obtenemos la sesión más reciente llamando a getSession() directamente en el cliente
-      // para asegurar que Supabase refresque automáticamente el token si estaba expirado.
-      const supabase = createClient()
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession()
+        // Obtenemos la sesión más reciente llamando a getSession() directamente en el cliente
+        // para asegurar que Supabase refresque automáticamente el token si estaba expirado.
+        const supabase = createClient()
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession()
 
-      const accessToken = currentSession?.access_token
-      if (!accessToken) {
-        console.error("[Frontend] No access token available. Redirecting to login.")
-        router.push("/login")
-        return
-      }
+        const accessToken = currentSession?.access_token
+        if (!accessToken) {
+          console.error("[Frontend] No access token available. Redirecting to login.")
+          router.push("/login")
+          return
+        }
 
-      console.log(
-        "[Frontend] Token de acceso verificado exitosamente:",
-        `${accessToken.substring(0, 15)}...`
-      )
-      console.log("[Frontend] Enviando solicitud de prospección (autenticada):", form)
+        console.log(
+          "[Frontend] Token de acceso verificado exitosamente:",
+          `${accessToken.substring(0, 15)}...`
+        )
+        console.log("[Frontend] Enviando solicitud de prospección (autenticada):", form)
 
-      const response = await apiFetch("/api/v1/prospect", {
-        method: "POST",
-        token: accessToken,
-        body: bodyPayload,
-      })
-
-      if (response.status === 401) {
-        console.error("[Frontend] Token inválido o expirado en el backend. Redirigiendo a login.")
-        router.push("/login")
-        return
-      }
-
-      if (!response.ok) {
-        const errorBody = await response.text()
-        console.error(`[Frontend] Error HTTP ${response.status}:`, errorBody)
-        throw new Error(`Error del servidor: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.job_id) {
-        console.log(`[Frontend] Job iniciado con ID: ${data.job_id}. Iniciando polling...`)
-        toast({
-          title: "Prospección en curso",
-          description: "Buscando y evaluando perfiles. Este proceso puede tomar varios minutos...",
+        const response = await apiFetch("/api/v1/prospect", {
+          method: "POST",
+          token: accessToken,
+          body: bodyPayload,
         })
-        pollJob(data.job_id, accessToken)
-      } else {
-        // Fallback para ejecución síncrona (si el backend no retorna job_id)
-        const leads: ProspectResult[] = data.leads ?? []
-        console.log(`[Frontend] Prospección síncrona completada.`)
-        setResults(leads)
+
+        if (response.status === 401) {
+          console.error("[Frontend] Token inválido o expirado en el backend. Redirigiendo a login.")
+          router.push("/login")
+          return
+        }
+
+        if (!response.ok) {
+          const errorBody = await response.text()
+          console.error(`[Frontend] Error HTTP ${response.status}:`, errorBody)
+          throw new Error(`Error del servidor: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        if (data.job_id) {
+          console.log(`[Frontend] Job iniciado con ID: ${data.job_id}. Iniciando polling...`)
+          try {
+            toast({
+              title: "Prospección en curso",
+              description: "Buscando y evaluando perfiles. Este proceso puede tomar varios minutos...",
+            })
+          } catch (e) {
+            console.error("[Frontend] Error showing running job toast:", e)
+          }
+          pollJob(data.job_id, accessToken)
+        } else {
+          // Fallback para ejecución síncrona (si el backend no retorna job_id)
+          const leads: ProspectResult[] = data.leads ?? []
+          console.log(`[Frontend] Prospección síncrona completada.`)
+          setResults(leads)
+          setHasSearched(true)
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.error("[Frontend] Error en la solicitud de prospección:", error)
+        setResults([])
         setHasSearched(true)
         setIsLoading(false)
       }
-    } catch (error) {
-      console.error("[Frontend] Error en la solicitud de prospección:", error)
-      setResults([])
-      setHasSearched(true)
+    } catch (criticalError) {
+      console.error("[Frontend] Uncaught error in handleSubmit:", criticalError)
       setIsLoading(false)
+      try {
+        toast({
+          variant: "destructive",
+          title: "Error inesperado",
+          description: "Ocurrió un error crítico al iniciar la prospección.",
+        })
+      } catch (e) {
+        console.error("[Frontend] Error showing critical error toast:", e)
+      }
     }
   }
 

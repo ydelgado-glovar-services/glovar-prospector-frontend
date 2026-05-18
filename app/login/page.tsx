@@ -11,7 +11,7 @@
 import { useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Sparkles, Loader2, Mail, Lock, ArrowRight, UserPlus } from "lucide-react"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/utils/supabase/client"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

@@ -19,11 +19,10 @@ import {
   useEffect,
   useState,
   useCallback,
-  useMemo,
   type ReactNode,
 } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/utils/supabase/client"
 import type { Session, User } from "@supabase/supabase-js"
 
 // ── Tipos ──
@@ -61,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   
-  // Inicializar Supabase memoizado para evitar recreaciones
-  const supabase = useMemo(() => createClient(), [])
+  // createBrowserClient is naturally a singleton on the client
+  const supabase = createClient()
 
   // Obtener el rol del usuario desde la tabla user_profiles
   const fetchRole = useCallback(
@@ -76,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.warn("[Auth] No se pudo obtener el rol del usuario, asignando 'client':", error.message)
-          setRole("client") // Rol por defecto según requerimiento
+          setRole("client")
           return
         }
 
@@ -90,80 +89,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    let isMounted = true
-
-    // ── Inicializar sesión sin retry/timeout ────────────────────────
-    const initSession = async () => {
-      try {
-        setIsLoading(true)
-        const { data, error } = await supabase.auth.getSession()
-
-        if (error) {
-          throw error
-        }
-
-        if (isMounted) {
-          setSession(data.session)
-          setUser(data.session?.user ?? null)
-
-          if (data.session?.user) {
-            await fetchRole(data.session.user.id)
-          } else {
-            setRole(null)
-          }
-        }
-      } catch (err) {
-        console.error("[Auth] Error inicial al obtener sesión. Limpiando estado.", err)
-        if (isMounted) {
-          setSession(null)
-          setUser(null)
-          setRole(null)
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    initSession()
-
-    // Escuchar cambios de estado en la autenticación de Supabase
+    // onAuthStateChange fires an INITIAL_SESSION event immediately upon mount.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!isMounted) return
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      setSession(currentSession)
+      setUser(currentSession?.user ?? null)
 
-      try {
-        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-          setSession(null)
-          setUser(null)
-          setRole(null)
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-          setSession(newSession)
-          setUser(newSession?.user ?? null)
+      if (currentSession?.user) {
+        await fetchRole(currentSession.user.id)
+      } else {
+        setRole(null)
+      }
 
-          if (newSession?.user) {
-            await fetchRole(newSession.user.id)
-          } else {
-            setRole(null)
-          }
-        }
+      setIsLoading(false)
 
-        // Forzar la recarga del enrutador para reevaluar middlewares de protección
+      // Only refresh the Next.js router on actual auth state changes (not token refreshes)
+      // to avoid interrupting the user's UI.
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         router.refresh()
-      } catch (err) {
-        console.error("[Auth] Error en el listener de cambio de estado de autenticación:", err)
-        setRole("client")
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
       }
     })
 
     return () => {
-      isMounted = false
       subscription.unsubscribe()
     }
   }, [supabase, fetchRole, router])

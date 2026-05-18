@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation"
 import { Shield, ShieldAlert, Users, Loader2, ArrowLeft } from "lucide-react"
 
 import { useAuth } from "@/components/auth-provider"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {

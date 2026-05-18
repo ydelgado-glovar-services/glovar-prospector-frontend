@@ -49,49 +49,53 @@ export function SearchForm({ values, isLoading, onChange, onSubmit, onClear }: S
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     
-    const newErrors: Record<string, string> = {}
-    
-    if (!values.mi_empresa?.trim()) newErrors.mi_empresa = "Campo obligatorio"
-    if (!values.sector?.trim()) newErrors.sector = "Campo obligatorio"
-    if (!values.pais?.trim()) newErrors.pais = "Campo obligatorio"
-    if (!values.tamano_empresa?.trim()) newErrors.tamano_empresa = "Campo obligatorio"
-    if (!values.cargo_decision?.trim()) newErrors.cargo_decision = "Campo obligatorio"
-    if (!values.dolor_cliente?.trim()) newErrors.dolor_cliente = "Campo obligatorio"
-    if (!values.propuesta_valor?.trim()) newErrors.propuesta_valor = "Campo obligatorio"
+    try {
+      const newErrors: Record<string, string> = {}
+      
+      if (!values.mi_empresa?.trim()) newErrors.mi_empresa = "Campo obligatorio"
+      if (!values.sector?.trim()) newErrors.sector = "Campo obligatorio"
+      if (!values.pais?.trim()) newErrors.pais = "Campo obligatorio"
+      if (!values.tamano_empresa?.trim()) newErrors.tamano_empresa = "Campo obligatorio"
+      if (!values.cargo_decision?.trim()) newErrors.cargo_decision = "Campo obligatorio"
+      if (!values.dolor_cliente?.trim()) newErrors.dolor_cliente = "Campo obligatorio"
+      if (!values.propuesta_valor?.trim()) newErrors.propuesta_valor = "Campo obligatorio"
 
-    // ── Guardrail: máx 3 términos separados por coma en Cargo y Sector ──
-    const cargoCount = _countTerms(values.cargo_decision)
-    const sectorCount = _countTerms(values.sector)
+      // ── Guardrail: máx 3 términos separados por coma en Cargo y Sector ──
+      const cargoCount = _countTerms(values.cargo_decision)
+      const sectorCount = _countTerms(values.sector)
 
-    if (cargoCount > MAX_CSV_TERMS) {
-      newErrors.cargo_decision = CSV_WARNING
-    }
-    if (sectorCount > MAX_CSV_TERMS) {
-      newErrors.sector = CSV_WARNING
-    }
+      if (cargoCount > MAX_CSV_TERMS) {
+        newErrors.cargo_decision = CSV_WARNING
+      }
+      if (sectorCount > MAX_CSV_TERMS) {
+        newErrors.sector = CSV_WARNING
+      }
 
-    if (Object.keys(newErrors).length > 0) {
-      setFormErrors(newErrors)
+      if (Object.keys(newErrors).length > 0) {
+        setFormErrors(newErrors)
 
-      // ── Scroll to the first invalid field (safe, non-blocking) ──
-      const firstErrorKey = Object.keys(newErrors)[0]
-      setTimeout(() => {
-        try {
-          const errorElement = document.getElementById(firstErrorKey)
-          if (errorElement) {
-            errorElement.scrollIntoView({ behavior: "smooth", block: "center" })
-            errorElement.focus({ preventScroll: true })
+        // ── Scroll to the first invalid field (safe, non-blocking) ──
+        const firstErrorKey = Object.keys(newErrors)[0]
+        setTimeout(() => {
+          try {
+            const errorElement = document.getElementById(firstErrorKey)
+            if (errorElement) {
+              errorElement?.scrollIntoView?.({ behavior: "smooth", block: "center" })
+              errorElement?.focus?.({ preventScroll: true })
+            }
+          } catch {
+            // Silently ignore if the DOM element is not found
           }
-        } catch {
-          // Silently ignore if the DOM element is not found
-        }
-      }, 50)
+        }, 50)
 
-      return
+        return
+      }
+      
+      setFormErrors({})
+      onSubmit()
+    } catch (err) {
+      console.error("[Frontend] Error crítico en la validación del formulario:", err)
     }
-    
-    setFormErrors({})
-    onSubmit()
   }
 
   return (
