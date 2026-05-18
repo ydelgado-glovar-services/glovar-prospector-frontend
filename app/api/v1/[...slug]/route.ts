@@ -23,47 +23,38 @@ async function handleRequest(request: NextRequest, context: RouteContext) {
     const slugArray = resolvedParams?.slug || [];
     const path = slugArray.join('/');
 
-    // Reconstruct the target FastAPI URL dynamically
-    const backendUrl = process.env.PYTHON_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-    const endpoint = `${backendUrl}/api/v1/${path}${request.nextUrl.search}`
+    // 1. URL Sanitization
+    const backendEnv = process.env.PYTHON_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    const baseUrl = backendEnv.replace(/\/$/, '');
+    const targetUrl = `${baseUrl}/api/v1/${path}${request.nextUrl.search}`;
 
-    // Prepare headers
-    const headers = new Headers(request.headers)
-    
-    // Inject custom header for user ID
-    headers.set('X-User-Id', user.id)
-    
-    // We shouldn't forward the Host header to the backend, it can cause issues
-    headers.delete('Host')
-    headers.delete('Connection')
+    // 2. Header Sanitization (CRITICAL)
+    // We explicitly avoid cloning request.headers to prevent passing Host, Connection, or Content-Length
+    const headers = new Headers();
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers.set('Authorization', authHeader);
+    }
+    headers.set('X-User-Id', user.id);
     
     const requestInit: RequestInit = {
       method: request.method,
       headers: headers,
     }
     
+    // 3. Body Handling
     if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
-      const clonedReq = request.clone()
-      const text = await clonedReq.text()
-      
-      if (text) {
-        try {
-          const payload = JSON.parse(text)
-          // Inject the authenticated user.id into the payload
-          const enrichedPayload = {
-            ...payload,
-            user_id: user.id
-          }
-          requestInit.body = JSON.stringify(enrichedPayload)
-          headers.set('Content-Type', 'application/json')
-        } catch (e) {
-          // If not JSON or failed to parse, send original text
-          requestInit.body = text
-        }
-      }
+      headers.set('Content-Type', 'application/json');
+      const body = await request.json().catch(() => ({}));
+      body.user_id = user.id;
+      requestInit.body = JSON.stringify(body);
     }
 
-    const response = await fetch(endpoint, requestInit)
+    // 4. Forensic Logging
+    console.log(`[PROXY ${request.method}] Target URL:`, targetUrl);
+    console.log(`[PROXY ${request.method}] Headers injected:`, { "X-User-Id": user.id });
+
+    const response = await fetch(targetUrl, requestInit)
 
     // Handle response gracefully
     const contentType = response.headers.get('content-type')
@@ -78,10 +69,11 @@ async function handleRequest(request: NextRequest, context: RouteContext) {
       })
     }
 
-  } catch (error: any) {
-    console.error(`[Next.js Catch-All Proxy] Error:`, error)
+  } catch (err: any) {
+    // 5. Error Tracing
+    console.error(`[PROXY FETCH ERROR]:`, err.message, err.cause);
     return NextResponse.json(
-      { error: 'Internal Server Error', details: error.message },
+      { error: 'Internal Server Error', details: err.message },
       { status: 500 }
     )
   }
