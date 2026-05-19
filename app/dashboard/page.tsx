@@ -8,7 +8,7 @@
  * The fetch call to the backend now includes the JWT Authorization header.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 
 import { AppHeader } from "@/components/app-header"
@@ -68,6 +68,8 @@ export default function DashboardPage() {
 
   // Granular progress for the progress bar
   const [jobProgress, setJobProgress] = useState<JobProgress>({ phase: "", processed: 0, total: 0 })
+
+  const supabase = useMemo(() => createClient(), [])
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
@@ -130,7 +132,6 @@ export default function DashboardPage() {
 
   const fetchQueries = async () => {
     try {
-      const supabase = createClient()
       const { data: { session: currentSession } } = await supabase.auth.getSession()
 
       if (!currentSession?.access_token) {
@@ -267,8 +268,19 @@ export default function DashboardPage() {
       }
 
       // Obtenemos la sesión más reciente llamando a getSession() directamente en el cliente
-      const supabase = createClient()
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      console.log("[Frontend] Checkpoint: Before Supabase getSession")
+      console.log("[Frontend] Supabase Client defined?", !!supabase)
+
+      let currentSession;
+      try {
+        const { data } = await supabase.auth.getSession()
+        currentSession = data.session
+      } catch (authError) {
+        console.error("[Frontend] CRITICAL: Failed during supabase.auth.getSession()", authError)
+        throw authError
+      }
+
+      console.log("[Frontend] Checkpoint: After Supabase getSession")
 
       const accessToken = currentSession?.access_token
       if (!accessToken) {
