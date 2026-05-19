@@ -43,7 +43,7 @@ const LS_KEYS = {
 // This is strictly outside the React component scope to prevent Promise cancellation
 // and closure trapping during rapid re-renders.
 const executeProspectRequest = async (
-  supabase: any,
+  accessToken: string,
   formPayload: string,
   router: any,
   toast: any,
@@ -51,30 +51,6 @@ const executeProspectRequest = async (
   setResults: (results: any[]) => void,
   setHasSearched: (val: boolean) => void
 ) => {
-  console.log("[Frontend] Checkpoint: Before Supabase getSession")
-  console.log("[Frontend] Supabase Client defined?", !!supabase)
-
-  let currentSession;
-  try {
-    // Timeout Guard: Prevent Supabase hanging indefinitely
-    const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) =>
-      setTimeout(() => reject(new Error("Supabase auth.getSession() TIMEOUT after 5 seconds")), 5000)
-    );
-    
-    const { data } = await Promise.race([
-      supabase.auth.getSession(),
-      timeoutPromise
-    ]);
-    currentSession = data.session;
-  } catch (authError) {
-    console.error("[Frontend] CRITICAL: Failed during supabase.auth.getSession()", authError)
-    throw authError
-  }
-
-  console.log("[Frontend] Checkpoint: After Supabase getSession")
-  console.log("[Frontend] Session Expiry Time:", currentSession?.expires_at)
-
-  const accessToken = currentSession?.access_token
   if (!accessToken) {
     console.error("[Frontend] No access token available. Redirecting to login.")
     router.push("/login")
@@ -156,8 +132,6 @@ export default function DashboardPage() {
   // Granular progress for the progress bar
   const [jobProgress, setJobProgress] = useState<JobProgress>({ phase: "", processed: 0, total: 0 })
 
-  const supabase = useMemo(() => createClient(), [])
-
   const isFetchingRef = useRef<boolean>(false) // Mutex lock
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
@@ -220,16 +194,14 @@ export default function DashboardPage() {
 
   const fetchQueries = async () => {
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
-
-      if (!currentSession?.access_token) {
+      if (!session?.access_token) {
         console.error("[Frontend] No valid session for fetching queries.")
         router.push("/login")
         return
       }
 
       const response = await apiFetch("/api/v1/queries", {
-        token: currentSession.access_token,
+        token: session.access_token,
       })
 
       if (response.status === 401) {
@@ -361,9 +333,17 @@ export default function DashboardPage() {
         throw err;
       }
 
+      // Retrieve token instantaneously from the pre-warmed Auth Context (RAM)
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        console.error("[Frontend] CRITICAL: handleSubmit fired without an active token in context.");
+        router.push("/login");
+        return; // finally block will unlock mutex
+      }
+
       // Execute the isolated fetch logic
       const result = await executeProspectRequest(
-        supabase,
+        accessToken,
         bodyPayload,
         router,
         toast,
