@@ -40,7 +40,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   role: null,
   isLoading: true,
-  signOut: async () => {},
+  signOut: async () => { },
 })
 
 // ── Hook personalizado ──
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  
+
   // createBrowserClient is naturally a singleton on the client
   const supabase = createClient()
 
@@ -104,9 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false)
 
-      // Only refresh the Next.js router on actual auth state changes (not token refreshes)
-      // to avoid interrupting the user's UI.
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+      // [Sec-Driven] Listen for TOKEN_REFRESHED and USER_UPDATED to ensure the active
+      // session state matches the newly issued secure tokens, preventing 401s on client-side fetch.
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
         router.refresh()
       }
     })
