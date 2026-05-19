@@ -39,6 +39,93 @@ const LS_KEYS = {
   jobId: "prospect_active_job_id",
 } as const
 
+// ── ISOLATED FETCH LOGIC ─────────────────────────────────────────────────────────
+// This is strictly outside the React component scope to prevent Promise cancellation
+// and closure trapping during rapid re-renders.
+const executeProspectRequest = async (
+  supabase: any,
+  formPayload: string,
+  router: any,
+  toast: any,
+  pollJob: (jobId: string, accessToken: string) => void,
+  setResults: (results: any[]) => void,
+  setHasSearched: (val: boolean) => void
+) => {
+  console.log("[Frontend] Checkpoint: Before Supabase getSession")
+  console.log("[Frontend] Supabase Client defined?", !!supabase)
+
+  let currentSession;
+  try {
+    // Timeout Guard: Prevent Supabase hanging indefinitely
+    const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) =>
+      setTimeout(() => reject(new Error("Supabase auth.getSession() TIMEOUT after 5 seconds")), 5000)
+    );
+    
+    const { data } = await Promise.race([
+      supabase.auth.getSession(),
+      timeoutPromise
+    ]);
+    currentSession = data.session;
+  } catch (authError) {
+    console.error("[Frontend] CRITICAL: Failed during supabase.auth.getSession()", authError)
+    throw authError
+  }
+
+  console.log("[Frontend] Checkpoint: After Supabase getSession")
+  console.log("[Frontend] Session Expiry Time:", currentSession?.expires_at)
+
+  const accessToken = currentSession?.access_token
+  if (!accessToken) {
+    console.error("[Frontend] No access token available. Redirecting to login.")
+    router.push("/login")
+    return { jobStarted: false }
+  }
+
+  console.log("[Frontend] Checkpoint: Immediately before apiFetch")
+  console.log("[Frontend] Enviando solicitud de prospección (autenticada):", formPayload)
+
+  const response = await apiFetch("/api/v1/prospect", {
+    method: "POST",
+    token: accessToken,
+    body: formPayload,
+  })
+
+  if (response.status === 401) {
+    console.error("[Frontend] Token inválido o expirado en el backend. Redirigiendo a login.")
+    router.push("/login")
+    return { jobStarted: false }
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    console.error(`[Frontend] Error HTTP ${response.status}:`, errorBody)
+    throw new Error(`Error del servidor: ${response.status} - ${errorBody}`)
+  }
+
+  const data = await response.json()
+
+  if (data.job_id) {
+    console.log(`[Frontend] Job iniciado con ID: ${data.job_id}. Iniciando polling...`)
+    try {
+      toast({
+        title: "Prospección en curso",
+        description: "Buscando y evaluando perfiles. Este proceso puede tomar varios minutos...",
+      })
+    } catch (e) {
+      console.error("[Frontend] Error showing running job toast:", e)
+    }
+    pollJob(data.job_id, accessToken)
+    return { jobStarted: true }
+  } else {
+    // Fallback para ejecución síncrona
+    const leads: ProspectResult[] = data.leads ?? []
+    console.log(`[Frontend] Prospección síncrona completada.`)
+    setResults(leads)
+    setHasSearched(true)
+    return { jobStarted: false }
+  }
+}
+
 // ── Polling config ──────────────────────────────────────────────────────────
 // Exponential backoff: starts at POLL_MIN_MS, doubles each attempt, caps at POLL_MAX_MS.
 // Total budget: ~300 s (5 minutes) before the soft-timeout fires.
@@ -71,6 +158,7 @@ export default function DashboardPage() {
 
   const supabase = useMemo(() => createClient(), [])
 
+  const isFetchingRef = useRef<boolean>(false) // Mutex lock
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
   const pollIntervalRef = useRef<number>(POLL_MIN_MS) // current backoff interval
@@ -229,33 +317,39 @@ export default function DashboardPage() {
 
   // ── UPDATED: fetch explícitamente refresca y verifica la sesión y el token ──
   const handleSubmit = async () => {
-    // [DEBUG] Hard Reset disabled to expose silent failures
-    // resetSystemState()
-
-    const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
-
-    // Validate ONLY the required fields.
-    if (!sector?.trim() || !pais?.trim() || !tamano_empresa?.trim() || !cargo_decision?.trim() || !dolor_cliente?.trim() || !propuesta_valor?.trim()) {
-      try {
-        toast({
-          variant: "destructive",
-          title: "Campos incompletos",
-          description: "Por favor, completa todos los campos requeridos del formulario.",
-        })
-      } catch (e) {
-        console.error("[Frontend] Error showing incomplete fields toast:", e)
-      }
+    // STRICT MUTEX LOCK
+    if (isFetchingRef.current) {
+      console.warn("[Frontend] Mutex Locked: Previendo ejecución duplicada de handleSubmit")
       return
     }
-
-    setIsLoading(true)
-    setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+    isFetchingRef.current = true
 
     let jobStarted = false
 
     try {
+      // [DEBUG] Hard Reset disabled to expose silent failures
+      // resetSystemState()
+
+      const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
+
+      // Validate ONLY the required fields.
+      if (!sector?.trim() || !pais?.trim() || !tamano_empresa?.trim() || !cargo_decision?.trim() || !dolor_cliente?.trim() || !propuesta_valor?.trim()) {
+        try {
+          toast({
+            variant: "destructive",
+            title: "Campos incompletos",
+            description: "Por favor, completa todos los campos requeridos del formulario.",
+          })
+        } catch (e) {
+          console.error("[Frontend] Error showing incomplete fields toast:", e)
+        }
+        return // finally block will reset mutex
+      }
+
+      setIsLoading(true)
+      setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+
       // ── Synchronization buffer ───────────────────────────────────────────────
-      // Allow React's reconciler to catch up before the next API fetch.
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       // [Error Boundary]: Pre-flight serialization check
@@ -267,72 +361,21 @@ export default function DashboardPage() {
         throw err;
       }
 
-      // Obtenemos la sesión más reciente llamando a getSession() directamente en el cliente
-      console.log("[Frontend] Checkpoint: Before Supabase getSession")
-      console.log("[Frontend] Supabase Client defined?", !!supabase)
-
-      let currentSession;
-      try {
-        const { data } = await supabase.auth.getSession()
-        currentSession = data.session
-      } catch (authError) {
-        console.error("[Frontend] CRITICAL: Failed during supabase.auth.getSession()", authError)
-        throw authError
+      // Execute the isolated fetch logic
+      const result = await executeProspectRequest(
+        supabase,
+        bodyPayload,
+        router,
+        toast,
+        pollJob,
+        setResults,
+        setHasSearched
+      )
+      
+      if (result) {
+        jobStarted = result.jobStarted
       }
 
-      console.log("[Frontend] Checkpoint: After Supabase getSession")
-      console.log("[Frontend] Session Expiry Time:", currentSession?.expires_at)
-
-      const accessToken = currentSession?.access_token
-      if (!accessToken) {
-        console.error("[Frontend] No access token available. Redirecting to login.")
-        router.push("/login")
-        return
-      }
-
-      console.log("[Frontend] Checkpoint: Immediately before apiFetch")
-      console.log("[Frontend] Enviando solicitud de prospección (autenticada):", form)
-
-      const response = await apiFetch("/api/v1/prospect", {
-        method: "POST",
-        token: accessToken,
-        body: bodyPayload,
-      })
-
-      if (response.status === 401) {
-        console.error("[Frontend] Token inválido o expirado en el backend. Redirigiendo a login.")
-        router.push("/login")
-        return
-      }
-
-      if (!response.ok) {
-        const errorBody = await response.text()
-        console.error(`[Frontend] Error HTTP ${response.status}:`, errorBody)
-        // Throw an explicit error to be caught by the main catch block
-        throw new Error(`Error del servidor: ${response.status} - ${errorBody}`)
-      }
-
-      const data = await response.json()
-
-      if (data.job_id) {
-        console.log(`[Frontend] Job iniciado con ID: ${data.job_id}. Iniciando polling...`)
-        try {
-          toast({
-            title: "Prospección en curso",
-            description: "Buscando y evaluando perfiles. Este proceso puede tomar varios minutos...",
-          })
-        } catch (e) {
-          console.error("[Frontend] Error showing running job toast:", e)
-        }
-        jobStarted = true
-        pollJob(data.job_id, accessToken)
-      } else {
-        // Fallback para ejecución síncrona
-        const leads: ProspectResult[] = data.leads ?? []
-        console.log(`[Frontend] Prospección síncrona completada.`)
-        setResults(leads)
-        setHasSearched(true)
-      }
     } catch (criticalError: any) {
       console.error("[Frontend] Uncaught error in handleSubmit. Error Object:", criticalError)
       console.error("[Frontend] Error Stack:", criticalError?.stack)
@@ -350,6 +393,7 @@ export default function DashboardPage() {
       if (!jobStarted) {
         setIsLoading(false)
       }
+      isFetchingRef.current = false // Unlock mutex
     }
   }
 
