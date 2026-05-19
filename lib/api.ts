@@ -43,7 +43,10 @@ export async function apiFetch(
     mergedHeaders["Content-Type"] = "application/json"
   }
 
-  return fetch(`${API_BASE}${path}`, {
+  const url = `${API_BASE}${path}`;
+  console.log(`[Network Inspector] Triggering fetch -> URL: ${url} | Method: ${rest.method || 'GET'}`);
+  
+  return fetch(url, {
     ...rest,
     headers: mergedHeaders,
   })

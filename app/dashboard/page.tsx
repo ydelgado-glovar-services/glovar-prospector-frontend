@@ -72,6 +72,7 @@ export default function DashboardPage() {
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
   const pollIntervalRef = useRef<number>(POLL_MIN_MS) // current backoff interval
+  const lastProgressHash = useRef<string>("") // prevent re-render loops
 
   // Clean up polling timer on unmount
   useEffect(() => {
@@ -458,12 +459,20 @@ export default function DashboardPage() {
         }
 
         // ── Still pending / processing ────────────────────────────────────────────
-        // Update granular progress
-        setJobProgress({
-          phase: data.current_phase ?? "",
-          processed: data.processed_leads ?? 0,
-          total: data.total_leads ?? 0,
-        })
+        // Update granular progress in a Main-Thread-Safe way
+        const newPhase = data.current_phase ?? ""
+        const newProcessed = data.processed_leads ?? 0
+        const newTotal = data.total_leads ?? 0
+        const currentProgressKey = `${newPhase}-${newProcessed}-${newTotal}`
+
+        if (lastProgressHash.current !== currentProgressKey) {
+          lastProgressHash.current = currentProgressKey
+          setJobProgress({
+            phase: newPhase,
+            processed: newProcessed,
+            total: newTotal,
+          })
+        }
         // Check if we've exhausted the total 5-minute budget
         if (elapsed >= POLL_BUDGET_MS) {
           console.warn(`[Frontend] ⏳ Budget agotado (${Math.round(elapsed / 1000)} s). Job: ${jobId}`)
