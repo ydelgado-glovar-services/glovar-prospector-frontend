@@ -229,8 +229,8 @@ export default function DashboardPage() {
 
   // ── UPDATED: fetch explícitamente refresca y verifica la sesión y el token ──
   const handleSubmit = async () => {
-    // Force reset at the very beginning to clear any stale/frozen states synchronously
-    resetSystemState()
+    // [DEBUG] Hard Reset disabled to expose silent failures
+    // resetSystemState()
 
     const { sector, pais, tamano_empresa, cargo_decision, dolor_cliente, propuesta_valor } = form
 
@@ -281,6 +281,7 @@ export default function DashboardPage() {
       }
 
       console.log("[Frontend] Checkpoint: After Supabase getSession")
+      console.log("[Frontend] Session Expiry Time:", currentSession?.expires_at)
 
       const accessToken = currentSession?.access_token
       if (!accessToken) {
@@ -289,6 +290,7 @@ export default function DashboardPage() {
         return
       }
 
+      console.log("[Frontend] Checkpoint: Immediately before apiFetch")
       console.log("[Frontend] Enviando solicitud de prospección (autenticada):", form)
 
       const response = await apiFetch("/api/v1/prospect", {
@@ -306,7 +308,8 @@ export default function DashboardPage() {
       if (!response.ok) {
         const errorBody = await response.text()
         console.error(`[Frontend] Error HTTP ${response.status}:`, errorBody)
-        throw new Error(`Error del servidor: ${response.status}`)
+        // Throw an explicit error to be caught by the main catch block
+        throw new Error(`Error del servidor: ${response.status} - ${errorBody}`)
       }
 
       const data = await response.json()
@@ -330,8 +333,9 @@ export default function DashboardPage() {
         setResults(leads)
         setHasSearched(true)
       }
-    } catch (criticalError) {
-      console.error("[Frontend] Uncaught error in handleSubmit:", criticalError)
+    } catch (criticalError: any) {
+      console.error("[Frontend] Uncaught error in handleSubmit. Error Object:", criticalError)
+      console.error("[Frontend] Error Stack:", criticalError?.stack)
       try {
         toast({
           variant: "destructive",
