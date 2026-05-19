@@ -104,8 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false)
 
-      // [Sec-Driven] Listen for TOKEN_REFRESHED and USER_UPDATED to ensure the active
-      // session state matches the newly issued secure tokens, preventing 401s on client-side fetch.
+      // [Sec-Driven] Refresh the Next.js router cache on every meaningful auth transition:
+      // - SIGNED_IN / SIGNED_OUT : obvious state changes
+      // - TOKEN_REFRESHED        : Supabase silently issued a new JWT; flush old SSR cache
+      //                           so client-side fetches immediately use the new access_token
+      //                           from context and avoid 401s during long sessions.
+      // - USER_UPDATED           : email/password change; context must re-sync immediately.
       if (
         event === "SIGNED_IN" ||
         event === "SIGNED_OUT" ||

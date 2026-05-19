@@ -26,6 +26,8 @@ interface SearchFormProps {
 
 export function SearchForm({ values, isLoading, isSessionReady = true, onChange, onSubmit, onClear }: SearchFormProps) {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  // [Spec-Driven] Local raw string for exclusion list — parsed to string[] on submit
+  const [exclusionInput, setExclusionInput] = useState<string>("")
   const { toast } = useToast()
 
   /** Cuenta términos separados por coma (ignora espacios vacíos). */
@@ -51,6 +53,16 @@ export function SearchForm({ values, isLoading, isSessionReady = true, onChange,
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    // [Spec-Driven] Parse the raw comma-separated string into a clean string[] before submission.
+    // Filter out empty tokens from double-commas or trailing commas.
+    const parsedExclusionList: string[] = exclusionInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+
+    // Inject the parsed array into the form values so page.tsx serializes it correctly.
+    onChange({ exclusion_list: parsedExclusionList })
     
     try {
       if (!isSessionReady) {
@@ -342,6 +354,24 @@ export function SearchForm({ values, isLoading, isSessionReady = true, onChange,
                     disabled={isLoading}
                     rows={2}
                   />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="exclusion_list" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Empresas a excluir (Lista Negra)
+                  </Label>
+                  <Textarea
+                    id="exclusion_list"
+                    name="exclusion_list"
+                    placeholder="Ej: Epiliquid, Retail N1, Competidor ABC"
+                    value={exclusionInput}
+                    onChange={(event) => setExclusionInput(event.target.value)}
+                    disabled={isLoading}
+                    rows={2}
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-0.5">
+                    Ingresa los nombres de empresas que no deseas prospectar, separados por comas.
+                  </span>
                 </div>
               </AccordionContent>
             </AccordionItem>

@@ -15,6 +15,7 @@ export interface ProspectRequest {
   triggers_compra?: string
   casos_exito?: string
   keywords_industria?: string
+  exclusion_list?: string[]  // [Spec-Driven] O(n) blacklist — maps to SearchParams.exclusion_list in FastAPI
 }
 
 export interface ProspectResult {

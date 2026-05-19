@@ -31,6 +31,7 @@ const INITIAL_FORM: ProspectRequest = {
   triggers_compra: "",
   casos_exito: "",
   keywords_industria: "",
+  exclusion_list: [], // [Spec-Driven] Always present so FastAPI receives a valid list
 }
 
 const LS_KEYS = {
