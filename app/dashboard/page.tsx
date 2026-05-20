@@ -108,7 +108,7 @@ const executeProspectRequest = async (
 // Total budget: ~300 s (5 minutes) before the soft-timeout fires.
 const POLL_MIN_MS = 2_000   // 2 s  – initial interval
 const POLL_MAX_MS = 10_000  // 10 s – maximum interval
-const POLL_BUDGET_MS = 300_000 // 5 min total
+const POLL_BUDGET_MS = 9000_000 // 5 min total
 
 export default function DashboardPage() {
   const { session, isLoading: authLoading } = useAuth()
