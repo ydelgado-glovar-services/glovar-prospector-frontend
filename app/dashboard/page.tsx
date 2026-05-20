@@ -467,10 +467,27 @@ export default function DashboardPage() {
 
         if (data.status === "completed") {
           console.log(`[Frontend] ✅ Job completado (${Math.round(elapsed / 1000)} s): ${jobId}`)
-          const leads: ProspectResult[] = data.result?.leads ?? []
           try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
 
-          // ── Safety net: backend returned "completed" but 0 leads (should now be "error", but guard anyway) ──
+          // ── Fetch the leads that were saved to Supabase during the job ──────────────
+          // The job status endpoint does NOT embed leads in its response (stateless design).
+          // We must call GET /api/v1/leads to retrieve them from the database.
+          let leads: ProspectResult[] = []
+          try {
+            console.log("[Frontend] Fetching leads from /api/v1/leads...")
+            const leadsResponse = await apiFetch("/api/v1/leads", { token: accessToken })
+            if (leadsResponse.ok) {
+              const leadsData = await leadsResponse.json()
+              leads = leadsData.leads ?? []
+              console.log(`[Frontend] ✅ ${leads.length} leads recuperados de Supabase.`)
+            } else {
+              console.error(`[Frontend] ❌ Error al recuperar leads: HTTP ${leadsResponse.status}`)
+            }
+          } catch (fetchErr) {
+            console.error("[Frontend] ❌ Error en la petición de leads:", fetchErr)
+          }
+
+          // ── Safety net: job completed but 0 leads found ─────────────────────────────
           if (leads.length === 0) {
             setResults([])
             setHasSearched(true)
@@ -630,7 +647,16 @@ export default function DashboardPage() {
       const data = await response.json()
 
       if (data.status === "completed") {
-        const leads: ProspectResult[] = data.result?.leads ?? []
+        let leads: ProspectResult[] = []
+        try {
+          const leadsResponse = await apiFetch("/api/v1/leads", { token: session.access_token })
+          if (leadsResponse.ok) {
+            const leadsData = await leadsResponse.json()
+            leads = leadsData.leads ?? []
+          }
+        } catch (fetchErr) {
+          console.error("[Frontend] Error al recuperar leads en manual check:", fetchErr)
+        }
         try { localStorage.removeItem(LS_KEYS.jobId) } catch { /* ignore */ }
         setResults(leads)
         setHasSearched(true)
