@@ -2,24 +2,24 @@
  * lib/api.ts — Centralized fetch wrapper for the backend API.
  *
  * Encapsulates:
- *   • Base URL resolution (NEXT_PUBLIC_API_URL)
- *   • ngrok-skip-browser-warning header (always applied)
- *   • Content-Type defaulting
- *   • Authorization header injection when a token is provided
- *
- * Usage:
- *   import { apiFetch } from "@/lib/api"
- *   const res = await apiFetch("/api/v1/queries", { token: session.access_token })
+ * • Base URL resolution (NEXT_PUBLIC_API_URL)
+ * • ngrok-skip-browser-warning header (always applied)
+ * • Content-Type defaulting
+ * • Authorization header injection when a token is provided
+ * • Global 401 Unauthorized Interceptor (Stale Session Cleanup)
  */
+
+import { createClient } from '@supabase/supabase-js'
+
+// Inicializamos un cliente simple de Supabase solo para gestionar la destrucción de sesión
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 /**
- * Thin wrapper around `fetch()` that injects common headers.
- *
- * @param path     — API path (e.g. "/api/v1/prospect").
- * @param options  — Standard RequestInit plus an optional `token` shortcut.
- * @returns The raw `Response` object (caller handles status checks).
+ * Thin wrapper around `fetch()` that injects common headers and intercepts Auth errors.
  */
 export async function apiFetch(
   path: string,
@@ -28,9 +28,7 @@ export async function apiFetch(
   const { token, headers: extraHeaders, ...rest } = options
 
   const mergedHeaders: Record<string, string> = {
-    // Always skip the ngrok interstitial during development tunnels
     "ngrok-skip-browser-warning": "69420",
-    // Spread any caller-supplied headers
     ...(extraHeaders as Record<string, string>),
   }
 
@@ -38,16 +36,38 @@ export async function apiFetch(
     mergedHeaders["Authorization"] = `Bearer ${token}`
   }
 
-  // Default Content-Type for methods that typically carry a body
   if (rest.body && !mergedHeaders["Content-Type"]) {
     mergedHeaders["Content-Type"] = "application/json"
   }
 
-  const url = `${API_BASE}${path}`;
-  console.log(`[Network Inspector] Triggering fetch -> URL: ${url} | Method: ${rest.method || 'GET'}`);
-  
-  return fetch(url, {
-    ...rest,
-    headers: mergedHeaders,
-  })
+  const url = `${API_BASE}${path}`
+  console.log(`[Network Inspector] Triggering fetch -> URL: ${path} | Method: ${rest.method || 'GET'}`)
+
+  try {
+    const response = await fetch(url, {
+      ...rest,
+      headers: mergedHeaders,
+    })
+
+    // --- INTERCEPTOR DE SESIÓN MUERTA (401) ---
+    // Si el backend rechaza el token (expirado o inválido), destruimos la sesión local de Supabase
+    // para evitar el ciclo infinito de "usuario logueado pero bloqueado".
+    if (response.status === 401) {
+      console.error(`[Security] Token rechazado por el backend (HTTP 401) en ${path}. Purgando sesión local...`)
+
+      // Destruye la memoria local (localStorage) de Supabase
+      await supabase.auth.signOut()
+
+      // Redirigimos al usuario forzosamente al login
+      if (typeof window !== "undefined") {
+        window.location.href = "/login" // O la ruta donde tengas tu formulario de entrada
+      }
+    }
+
+    return response
+
+  } catch (error) {
+    console.error(`[Network Error] Fallo al ejecutar fetch a ${path}:`, error)
+    throw error
+  }
 }
