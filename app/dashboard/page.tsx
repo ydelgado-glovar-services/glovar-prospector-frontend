@@ -27,7 +27,7 @@ const INITIAL_FORM: ProspectRequest = {
   cargo_decision: "",
   dolor_cliente: "",
   propuesta_valor: "",
-  limite_perfiles: 30,
+  limite_perfiles: 25,
   triggers_compra: "",
   casos_exito: "",
   keywords_industria: "",
@@ -350,6 +350,22 @@ export default function DashboardPage() {
           })
         } catch (e) {
           console.error("[Frontend] Error showing incomplete fields toast:", e)
+        }
+        return // finally block will reset mutex
+      }
+
+      // ── Guardrail: limite_perfiles must be between 5 and 25 ──────────────────
+      // Mirrors: z.number().min(5).max(25, "El límite máximo por búsqueda es 25 para proteger créditos.")
+      const limite = form.limite_perfiles ?? 25
+      if (limite < 5 || limite > 25) {
+        try {
+          toast({
+            variant: "destructive",
+            title: "Límite de perfiles inválido",
+            description: "El límite máximo por búsqueda es 25 para proteger créditos.",
+          })
+        } catch (e) {
+          console.error("[Frontend] Error showing limite_perfiles toast:", e)
         }
         return // finally block will reset mutex
       }

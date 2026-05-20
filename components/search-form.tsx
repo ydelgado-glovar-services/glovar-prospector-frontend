@@ -383,23 +383,23 @@ export function SearchForm({ values, isLoading, isSessionReady = true, onChange,
                 Límite de perfiles a analizar
               </Label>
               <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-sm font-bold font-mono text-primary">
-                {values.limite_perfiles ?? 30}
+                {values.limite_perfiles ?? 25}
               </span>
             </div>
             <Slider
               id="limite_perfiles"
               name="limite_perfiles"
               min={5}
-              max={30}
+              max={25}
               step={1}
-              value={[values.limite_perfiles ?? 30]}
+              value={[values.limite_perfiles ?? 25]}
               onValueChange={(val) => handleFieldChange({ limite_perfiles: val[0] })}
               disabled={isLoading}
               className="w-full"
             />
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
               <span>5</span>
-              <span>30</span>
+              <span>25</span>
             </div>
           </div>
 
