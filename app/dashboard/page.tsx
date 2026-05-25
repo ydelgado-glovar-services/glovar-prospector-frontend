@@ -21,6 +21,7 @@ import { apiFetch } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 const INITIAL_FORM: ProspectRequest = {
+  mi_empresa: "",
   sector: "",
   pais: "",
   tamano_empresa: "",
@@ -131,7 +132,7 @@ export default function DashboardPage() {
   const [timedOutJobId, setTimedOutJobId] = useState<string | null>(null)
 
   // Granular progress for the progress bar
-  const [jobProgress, setJobProgress] = useState<JobProgress>({ phase: "", processed: 0, total: 0 })
+  const [jobProgress, setJobProgress] = useState<JobProgress>({ phase: "", processed: 0, total: 0, progress_percentage: 0 })
 
   const isFetchingRef = useRef<boolean>(false) // Mutex lock
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -315,7 +316,7 @@ export default function DashboardPage() {
 
     setResults([])
     setIsLoading(false)
-    setJobProgress({ phase: "", processed: 0, total: 0 })
+    setJobProgress({ phase: "", processed: 0, total: 0, progress_percentage: 0 })
     setIsTimedOut(false)
     setTimedOutJobId(null)
     setHasSearched(false)
@@ -371,7 +372,7 @@ export default function DashboardPage() {
       }
 
       setIsLoading(true)
-      setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0 })
+      setJobProgress({ phase: "Iniciando prospección", processed: 0, total: 0, progress_percentage: 0 })
 
       // ── Synchronization buffer ───────────────────────────────────────────────
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -474,8 +475,8 @@ export default function DashboardPage() {
           // We must call GET /api/v1/leads to retrieve them from the database.
           let leads: ProspectResult[] = []
           try {
-            console.log("[Frontend] Fetching leads from /api/v1/leads...")
-            const leadsResponse = await apiFetch("/api/v1/leads", { token: accessToken })
+            console.log(`[Frontend] Fetching leads from /api/v1/leads for job ${jobId}...`)
+            const leadsResponse = await apiFetch(`/api/v1/leads?job_id=${jobId}`, { token: accessToken })
             if (leadsResponse.ok) {
               const leadsData = await leadsResponse.json()
               leads = leadsData.leads ?? []
@@ -494,7 +495,7 @@ export default function DashboardPage() {
             setIsLoading(false)
             setIsTimedOut(false)
             setTimedOutJobId(null)
-            setJobProgress({ phase: "", processed: 0, total: 0 })
+            setJobProgress({ phase: "", processed: 0, total: 0, progress_percentage: 0 })
             if (pollingTimerRef.current) {
               clearTimeout(pollingTimerRef.current)
               pollingTimerRef.current = null
@@ -512,7 +513,12 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(false)
           setTimedOutJobId(null)
-          setJobProgress({ phase: "Completado", processed: data.processed_leads ?? leads.length, total: data.total_leads ?? leads.length })
+          setJobProgress({
+            phase: "Completado",
+            processed: data.processed_leads ?? leads.length,
+            total: data.total_leads ?? leads.length,
+            progress_percentage: 100,
+          })
           if (pollingTimerRef.current) {
             clearTimeout(pollingTimerRef.current)
             pollingTimerRef.current = null
@@ -538,7 +544,7 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(false)
           setTimedOutJobId(null)
-          setJobProgress({ phase: "", processed: 0, total: 0 })
+          setJobProgress({ phase: "", processed: 0, total: 0, progress_percentage: 0 })
           if (pollingTimerRef.current) {
             clearTimeout(pollingTimerRef.current)
             pollingTimerRef.current = null
@@ -559,7 +565,7 @@ export default function DashboardPage() {
           setIsLoading(false)
           setIsTimedOut(false)
           setTimedOutJobId(null)
-          setJobProgress({ phase: "", processed: 0, total: 0 })
+          setJobProgress({ phase: "", processed: 0, total: 0, progress_percentage: 0 })
           if (pollingTimerRef.current) {
             clearTimeout(pollingTimerRef.current)
             pollingTimerRef.current = null
@@ -572,7 +578,8 @@ export default function DashboardPage() {
         const newPhase = data.current_phase ?? ""
         const newProcessed = data.processed_leads ?? 0
         const newTotal = data.total_leads ?? 0
-        const currentProgressKey = `${newPhase}-${newProcessed}-${newTotal}`
+        const newProgressPercentage = data.progress_percentage ?? 0
+        const currentProgressKey = `${newPhase}-${newProcessed}-${newTotal}-${newProgressPercentage}`
 
         if (lastProgressHash.current !== currentProgressKey) {
           lastProgressHash.current = currentProgressKey
@@ -580,6 +587,7 @@ export default function DashboardPage() {
             phase: newPhase,
             processed: newProcessed,
             total: newTotal,
+            progress_percentage: newProgressPercentage,
           })
         }
         // Check if we've exhausted the total 5-minute budget
@@ -649,7 +657,7 @@ export default function DashboardPage() {
       if (data.status === "completed") {
         let leads: ProspectResult[] = []
         try {
-          const leadsResponse = await apiFetch("/api/v1/leads", { token: session.access_token })
+          const leadsResponse = await apiFetch(`/api/v1/leads?job_id=${timedOutJobId}`, { token: session.access_token })
           if (leadsResponse.ok) {
             const leadsData = await leadsResponse.json()
             leads = leadsData.leads ?? []
@@ -776,15 +784,6 @@ export default function DashboardPage() {
     <div className="flex min-h-screen flex-col bg-muted/30">
       <AppHeader />
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 md:px-6 md:py-8">
-        <div className="mb-4 flex items-center justify-end">
-          <button
-            onClick={resetSystemState}
-            className="text-xs font-medium text-red-500 hover:text-red-600 hover:underline flex items-center gap-1"
-            title="Usa este botón si la aplicación se queda cargando de forma infinita."
-          >
-            Force Reset
-          </button>
-        </div>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
           <SearchForm
             values={form}

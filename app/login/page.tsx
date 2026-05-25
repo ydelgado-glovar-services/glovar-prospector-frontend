@@ -8,10 +8,11 @@
  * Redirects to /dashboard on successful authentication.
  */
 
-import { useState, type FormEvent } from "react"
+import { useState, useEffect, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Sparkles, Loader2, Mail, Lock, ArrowRight, UserPlus } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
+import { useAuth } from "@/components/auth-provider"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label"
 type AuthMode = "signin" | "signup"
 
 export default function LoginPage() {
+  const { setIsLoading: setGlobalLoading } = useAuth()
   const [mode, setMode] = useState<AuthMode>("signin")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -30,6 +32,11 @@ export default function LoginPage() {
 
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    setIsLoading(false)
+    setGlobalLoading(false)
+  }, [setGlobalLoading])
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()

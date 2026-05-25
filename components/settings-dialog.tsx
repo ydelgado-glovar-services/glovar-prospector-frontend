@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Component, type ReactNode } from "react"
 import { Settings, Mail, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,34 @@ import { useToast } from "@/components/ui/use-toast"
 import { apiFetch } from "@/lib/api"
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+
+if (!GOOGLE_CLIENT_ID) {
+  console.warn("[Google Identity] process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID is missing or undefined. Skipping initialization silently.");
+}
+
+// Error Boundary to gracefully absorb Google Identity Services initialization exceptions
+class SafeGoogleOAuthBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("[Google Identity Boundary] Caught initialization exception:", error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-lg border p-4 text-center text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20">
+          Servicio de autenticación de Google no disponible temporalmente.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function GmailConnectButton() {
   const { session } = useAuth()
@@ -115,9 +143,17 @@ export function SettingsDialog() {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-            <GmailConnectButton />
-          </GoogleOAuthProvider>
+          {GOOGLE_CLIENT_ID ? (
+            <SafeGoogleOAuthBoundary>
+              <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                <GmailConnectButton />
+              </GoogleOAuthProvider>
+            </SafeGoogleOAuthBoundary>
+          ) : (
+            <div className="rounded-lg border p-4 text-center text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20">
+              Servicio de autenticación de Google no configurado (client_id no disponible).
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -176,15 +176,9 @@ export function ResultsPanel({
 function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
   const processed = jobProgress?.processed ?? 0
   const total = jobProgress?.total ?? 0
-  const phase = jobProgress?.phase || "Ejecutando prospección..."
+  const phase = jobProgress?.phase || "Iniciando..."
 
-  // ── Weighted progress: phase-aware stages ──
-  const percent: number = (() => {
-    if (phase === "Iniciando prospección") return 10
-    if (phase === "Extrayendo de LinkedIn") return 45
-    if (total > 0) return 60 + Math.round((processed / total) * 40)
-    return 0
-  })()
+  const percent: number = jobProgress?.progress_percentage ?? 0
 
   return (
     <div
@@ -217,9 +211,9 @@ function LoadingState({ jobProgress }: { jobProgress?: JobProgress }) {
 
       {/* Progress bar */}
       <div className="w-full max-w-sm space-y-2">
-        <div className="flex items-center justify-between text-sm font-medium">
-          <span className="text-muted-foreground">{total > 0 ? "Procesando..." : "Iniciando..."}</span>
-          <span className="text-primary">{percent}%</span>
+        <div className="flex items-center justify-between text-sm font-medium w-full gap-2">
+          <span className="text-muted-foreground truncate" title={phase}>{phase}</span>
+          <span className="text-primary shrink-0">{percent}%</span>
         </div>
         <div
           className="relative w-full h-4 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
@@ -292,15 +286,15 @@ function TimeoutState({ onManualCheck }: { onManualCheck?: () => void }) {
 function EmptyState({ hasSearched }: { hasSearched: boolean }) {
   if (hasSearched) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-20 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted/50">
-          <Inbox className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-20 text-center animate-in fade-in-50 duration-300">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 shadow-sm">
+          <AlertCircle className="h-7 w-7 text-amber-600 dark:text-amber-400" aria-hidden="true" />
         </div>
-        <div className="max-w-md space-y-1">
-          <p className="text-base font-medium text-foreground">Sin leads encontrados</p>
-          <p className="text-xs text-muted-foreground text-pretty">
-            No se hallaron perfiles que coincidan con los filtros ingresados. Intenta ampliar los criterios de búsqueda.
-          </p>
+        <div className="max-w-md space-y-3">
+          <p className="text-base font-semibold text-foreground">Sin resultados calificados</p>
+          <div className="rounded-lg border border-amber-200/50 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-300 dark:border-amber-800/30 shadow-inner">
+            No companies or targets discovered matching the active search parameters.
+          </div>
         </div>
       </div>
     )
@@ -687,20 +681,15 @@ type TableFilter = "todos" | "calificados" | "descartados"
 
 function ReviewEmailDialog({
   result,
-  isConnected,
-  sendingEmailId,
-  onSend,
   onCopy
 }: {
   result: ProspectResult
-  isConnected: boolean
-  sendingEmailId: string | null
-  onSend: (subject: string, body: string) => void
   onCopy: (body: string) => void
 }) {
   const [subject, setSubject] = useState(`Explorando sinergias con ${result.empresa || 'tu empresa'}`)
   const [body, setBody] = useState(result.mensaje_generado || "")
   const [isOpen, setIsOpen] = useState(false)
+  const { toast } = useToast()
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -709,20 +698,15 @@ function ReviewEmailDialog({
           variant="default"
           size="sm"
           className="h-7 text-[10px] w-full bg-blue-600 hover:bg-blue-700 text-white gap-1"
-          disabled={!isConnected || sendingEmailId === result.nombre_lead}
         >
-          {sendingEmailId === result.nombre_lead ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Send className="h-3.5 w-3.5" />
-          )}
-          Revisar y Enviar
+          <Eye className="h-3.5 w-3.5" />
+          Ver Mensaje
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Revisar y Enviar Correo</DialogTitle>
-          <DialogDescription>Edita el asunto y el mensaje generado para {result.nombre_lead || "el lead"}</DialogDescription>
+          <DialogTitle>Mensaje de Prospección Generado</DialogTitle>
+          <DialogDescription>Revisa y copia el asunto y el cuerpo del correo personalizado por IA.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-4">
           <div className="flex flex-col gap-2">
@@ -735,25 +719,31 @@ function ReviewEmailDialog({
           </div>
         </div>
         <DialogFooter className="flex justify-end gap-2 mt-4">
-          <Button size="sm" variant="outline" onClick={() => onCopy(body)} className="gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              navigator.clipboard.writeText(subject)
+              toast({
+                title: "Asunto copiado",
+                description: "El asunto del correo ha sido copiado al portapapeles.",
+              })
+            }}
+            className="gap-1.5"
+          >
             <Copy className="h-4 w-4" />
-            Copiar
+            Copiar Asunto
           </Button>
           <Button
             size="sm"
             onClick={() => {
-              onSend(subject, body)
+              onCopy(body)
               setIsOpen(false)
             }}
-            disabled={!isConnected || sendingEmailId === result.nombre_lead || !body.trim()}
             className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {sendingEmailId === result.nombre_lead ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Enviar Correo
+            <Copy className="h-4 w-4" />
+            Copiar Cuerpo
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1033,9 +1023,6 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                       <div className="flex flex-col gap-1.5 items-center w-full max-w-[120px] mx-auto">
                         <ReviewEmailDialog
                           result={result}
-                          isConnected={isConnected}
-                          sendingEmailId={sendingEmailId}
-                          onSend={(subject, body) => handleSendEmail(result, subject, body)}
                           onCopy={(body) => {
                             navigator.clipboard.writeText(body)
                             toast({

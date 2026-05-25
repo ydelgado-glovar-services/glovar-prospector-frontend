@@ -9,12 +9,10 @@
  * • Global 401 Unauthorized Interceptor (Stale Session Cleanup)
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@/utils/supabase/client"
 
-// Inicializamos un cliente simple de Supabase solo para gestionar la destrucción de sesión
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Inicializamos o reutilizamos el cliente singleton de Supabase para gestionar la destrucción de sesión
+const supabase = createClient()
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 

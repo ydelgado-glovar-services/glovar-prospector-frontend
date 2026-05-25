@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
 import { apiFetch } from "@/lib/api"
+import { usePathname } from "next/navigation"
 
 interface IntegrationsContextValue {
   isConnected: boolean
@@ -37,33 +38,52 @@ export function useIntegrations() {
 export function IntegrationsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   const { toast } = useToast()
+  const pathname = usePathname()
   const [isConnected, setIsConnected] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false) // Lazy, non-blocking check starts as false
 
   const checkStatus = useCallback(async () => {
+    if (pathname === "/login" || pathname === "/register") {
+      setIsConnected(false)
+      setIsLoading(false)
+      return
+    }
+
     if (!session?.access_token) {
       setIsConnected(false)
       setIsLoading(false)
       return
     }
 
+    setIsLoading(true)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
     try {
       const res = await apiFetch("/api/v1/auth/google/status", {
         token: session.access_token,
-      })
+        signal: controller.signal,
+      } as any)
+      
+      clearTimeout(timeoutId)
       if (res.ok) {
         const data = await res.json()
-        setIsConnected(data.is_connected)
+        setIsConnected(data.is_connected || data.connected || false)
       } else {
         setIsConnected(false)
       }
-    } catch (error) {
-      console.error("[Integrations] Error checking connection status:", error)
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === "AbortError") {
+        console.warn("[Integrations] Connection check aborted due to 5s timeout ceiling.")
+      } else {
+        console.error("[Integrations] Error checking connection status:", error)
+      }
       setIsConnected(false)
     } finally {
       setIsLoading(false)
     }
-  }, [session])
+  }, [session, pathname])
 
   useEffect(() => {
     checkStatus()
