@@ -353,10 +353,32 @@ function safeRender(val: unknown): string {
 
 function safeUrl(val: unknown): string {
   if (!val) return ""
-  if (typeof val === "string") return val
+  if (typeof val === "string") {
+    const trimmed = val.trim()
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed
+    }
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        return safeUrl(parsed)
+      } catch {
+        // Fall through
+      }
+    }
+    return trimmed
+  }
   if (typeof val === "object") {
     const obj = val as Record<string, unknown>
-    return (obj.url as string) || (obj.linkedInUrl as string) || ""
+    const keys = ["linkedin_url", "linkedInUrl", "url", "link", "linkedin"]
+    for (const key of keys) {
+      if (typeof obj[key] === "string" && obj[key]) {
+        return obj[key] as string
+      }
+    }
+    if (Array.isArray(val) && val.length > 0) {
+      return safeUrl(val[0])
+    }
   }
   return ""
 }
