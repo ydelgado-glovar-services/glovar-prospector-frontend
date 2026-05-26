@@ -91,10 +91,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    let resolved = false
+
+    // [Sec-Driven] Safety timeout: if session initialization hangs for > 5 seconds,
+    // force-stop the loading state and resolve the session as null (unauthenticated).
+    // This prevents `authLoading` from getting permanently stuck at `true` under dormant tabs,
+    // offline states, or corrupted/expired Supabase local storage.
+    const authTimeout = setTimeout(() => {
+      if (!resolved) {
+        console.warn("[Auth] Initialization timed out (5s). Resolving state to unauthenticated.")
+        setIsLoading(false)
+        setSession(null)
+        setUser(null)
+        setRole(null)
+      }
+    }, 5000)
+
     // onAuthStateChange fires an INITIAL_SESSION event immediately upon mount.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, currentSession: Session | null) => {
+      resolved = true
+      clearTimeout(authTimeout) // Clear safety timeout if auth resolves successfully
+
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
 
@@ -123,26 +142,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      clearTimeout(authTimeout)
       subscription.unsubscribe()
     }
   }, [supabase, fetchRole, router])
 
   const signOut = useCallback(async () => {
     try {
-      // Clear session, user, and role instantly to trigger local UI transitions
+      setIsLoading(true)
+      console.log("[Auth] Initiating resilient signOut. Purging Supabase cookies and local state...")
+      
+      // 1. Perform background Supabase sign out FIRST to ensure cookies/storage are cleared synchronously
+      await supabase.auth.signOut()
+      
+      // 2. Clear state variables cleanly
       setSession(null)
       setUser(null)
       setRole(null)
       
-      // Perform immediate redirect
+      // 3. Navigate to login safely
       router.push("/login")
-      
-      // Attempt background Supabase sign out
-      await supabase.auth.signOut()
     } catch (err) {
-      console.error("[Auth] Error al cerrar sesión en Supabase:", err)
+      console.error("[Auth] Error during resilient signOut. Forcing redirect to /login anyway:", err)
+      // Fallback clean state and redirect even on failure
+      setSession(null)
+      setUser(null)
+      setRole(null)
+      router.push("/login")
+    } finally {
+      setIsLoading(false)
     }
   }, [supabase, router])
+
 
   return (
     <AuthContext.Provider value={{ session, user, role, isLoading, setIsLoading, signOut }}>

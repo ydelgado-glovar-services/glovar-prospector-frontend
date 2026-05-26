@@ -977,20 +977,108 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {result.url_noticia ? (
-                      <a
-                        href={result.url_noticia}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={result.url_noticia}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-amber-500 hover:text-amber-400 underline-offset-4 hover:underline transition-colors"
-                      >
-                        <span>Noticia</span>
-                        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      </a>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+                    {(() => {
+                      if (!result.url_noticia) return <span className="text-xs text-muted-foreground">—</span>;
+                      
+                      let parsedNews: { title: string; url: string }[] = [];
+                      let isJsonNews = false;
+                      try {
+                        let rawStr = result.url_noticia.trim();
+                        if (rawStr) {
+                          // Absorber strings JSON con doble serialización (comillas externas adicionales y caracteres escapados)
+                          if (rawStr.startsWith('"') && rawStr.endsWith('"') && rawStr.length > 2) {
+                            try {
+                              const parsedStr = JSON.parse(rawStr);
+                              if (typeof parsedStr === "string") {
+                                rawStr = parsedStr.trim();
+                              } else if (Array.isArray(parsedStr)) {
+                                parsedNews = parsedStr;
+                                isJsonNews = true;
+                              }
+                            } catch (e) {}
+                          }
+                          
+                          if (!isJsonNews && (rawStr.startsWith("[") || rawStr.startsWith("{"))) {
+                            const parsed = JSON.parse(rawStr);
+                            if (Array.isArray(parsed)) {
+                              parsedNews = parsed;
+                              isJsonNews = true;
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        // Fallback automatically
+                      }
+
+                      if (isJsonNews && parsedNews.length > 0) {
+                        let linkedinCount = 0;
+                        let googleCount = 0;
+                        return (
+                          <div className="flex flex-wrap gap-1 items-center max-w-[120px]">
+                            {parsedNews.map((newsItem, idx) => {
+                              const isLI = newsItem.url && newsItem.url.includes("linkedin.com");
+                              let label = "";
+                              let badgeClass = "";
+                              
+                              if (isLI) {
+                                linkedinCount++;
+                                label = `L${linkedinCount}`;
+                                badgeClass = "bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-600/20 hover:border-blue-600/40 cursor-pointer font-mono font-bold text-[10px] px-1.5 py-0.5 rounded transition-all hover:scale-105";
+                              } else {
+                                googleCount++;
+                                label = `G${googleCount}`;
+                                badgeClass = "bg-amber-600/10 hover:bg-amber-600/20 text-amber-600 dark:text-amber-400 border border-amber-600/20 hover:border-amber-600/40 cursor-pointer font-mono font-bold text-[10px] px-1.5 py-0.5 rounded transition-all hover:scale-105";
+                              }
+
+                              return (
+                                <Tooltip key={idx}>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={newsItem.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={badgeClass}
+                                    >
+                                      {label}
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                                    <p className="font-semibold mb-0.5">{isLI ? "LinkedIn Post / Evento" : "Noticia de Prensa / Google"}</p>
+                                    <p className="line-clamp-3 text-pretty">{newsItem.title}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate mt-1">{newsItem.url}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
+
+                      // Verificar si la URL es absoluta para evitar links relativos rotos en Vercel
+                      const isAbsoluteUrl = result.url_noticia && (result.url_noticia.startsWith("http://") || result.url_noticia.startsWith("https://"));
+                      
+                      if (isAbsoluteUrl) {
+                        return (
+                          <a
+                            href={result.url_noticia}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={result.url_noticia}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-500 hover:text-amber-400 underline-offset-4 hover:underline transition-colors"
+                          >
+                            <span>Noticia</span>
+                            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          </a>
+                        );
+                      } else {
+                        // Si falló el parseo y no es URL absoluta, renderizar como texto plano para no romper la interfaz
+                        return (
+                          <span className="text-xs text-muted-foreground block truncate max-w-[120px]" title={result.url_noticia}>
+                            {result.url_noticia}
+                          </span>
+                        );
+                      }
+                    })()}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">

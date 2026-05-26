@@ -139,8 +139,6 @@ export default function DashboardPage() {
   const pollStartRef = useRef<number>(0)       // wall-clock start of the current poll
   const pollIntervalRef = useRef<number>(POLL_MIN_MS) // current backoff interval
   const lastProgressHash = useRef<string>("") // prevent re-render loops
-  // [Sec-Driven] Hard ceiling on the auth loading spinner — prevents infinite hang on hard refresh
-  const [authTimeoutFired, setAuthTimeoutFired] = useState(false)
 
   // Clean up polling timer on unmount
   useEffect(() => {
@@ -158,17 +156,7 @@ export default function DashboardPage() {
     }
   }, [authLoading, session, router])
 
-  // [Sec-Driven] Hard timeout guard: if AuthProvider takes > 8 s to resolve,
-  // flip the spinner off so the user is never permanently blocked on hard refresh.
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (authLoading) {
-        console.warn("[Frontend] Auth loading timeout fired (6s). Forcing authLoading=false.")
-        setAuthTimeoutFired(true)
-      }
-    }, 6_000)
-    return () => clearTimeout(timeoutId)
-  }, [authLoading])
+  // (Client-side timeout is now handled natively within AuthProvider)
 
   // Cargar estado inicial desde localStorage en el cliente al montar
   // Si había un job activo antes de que el usuario recargara la página, lo retomamos.
@@ -767,9 +755,8 @@ export default function DashboardPage() {
     }
   }
 
-  // Show nothing while auth is loading (middleware handles the real guard)
-  // [Sec-Driven] authTimeoutFired ensures the spinner never blocks permanently
-  if (authLoading && !authTimeoutFired) {
+  // Show nothing while auth is loading (resilient loading state handled by AuthProvider)
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
         <div className="flex flex-col items-center gap-3">

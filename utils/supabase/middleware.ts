@@ -35,12 +35,63 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protected routes logic can be added here if needed
-  // if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/login'
-  //   return NextResponse.redirect(url)
-  // }
+  const pathname = request.nextUrl.pathname
+
+  // Protected routes: root `/` redirects to dashboard, `/dashboard`, and `/admin`
+  const isProtectedRoute =
+    pathname === '/' ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/admin')
+
+  // Auth routes: `/login`
+  const isAuthRoute = pathname.startsWith('/login')
+
+  if (!user && isProtectedRoute) {
+    console.log(`[Middleware] Unauthenticated access to protected route: ${pathname}. Redirecting to /login.`)
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    
+    const redirectResponse = NextResponse.redirect(url)
+    
+    // Propagate all cookies (including cleared/refreshed tokens) to the client on redirect
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        domain: cookie.domain,
+        path: cookie.path,
+        maxAge: cookie.maxAge,
+        secure: cookie.secure,
+        sameSite: cookie.sameSite,
+        expires: cookie.expires,
+        httpOnly: cookie.httpOnly,
+      })
+    })
+    
+    return redirectResponse
+  }
+
+  if (user && isAuthRoute) {
+    console.log(`[Middleware] Authenticated user on auth route: ${pathname}. Redirecting to /dashboard.`)
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    
+    const redirectResponse = NextResponse.redirect(url)
+    
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        domain: cookie.domain,
+        path: cookie.path,
+        maxAge: cookie.maxAge,
+        secure: cookie.secure,
+        sameSite: cookie.sameSite,
+        expires: cookie.expires,
+        httpOnly: cookie.httpOnly,
+      })
+    })
+    
+    return redirectResponse
+  }
+
 
   return supabaseResponse
 }
+
