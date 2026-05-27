@@ -403,6 +403,33 @@ export function SearchForm({ values, isLoading, isSessionReady = true, onChange,
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="max_news_articles" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Velocidad de Prospección
+            </Label>
+            <Select
+              name="max_news_articles"
+              value={String(values.max_news_articles ?? 3)}
+              onValueChange={(val) => handleFieldChange({ max_news_articles: Number(val) })}
+              disabled={isLoading}
+            >
+              <SelectTrigger 
+                id="max_news_articles"
+                className="w-full border-border/80 shadow-sm"
+              >
+                <SelectValue placeholder="Selecciona la velocidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">⚡ Rápido (1 art. / empresa · ~3 min)</SelectItem>
+                <SelectItem value="3">🚀 Estándar (3 art. / empresa · ~6 min)</SelectItem>
+                <SelectItem value="5">🔍 Profundo (5 art. / empresa · ~10 min)</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-[10px] text-muted-foreground mt-0.5">
+              Controla cuántas noticias y publicaciones de LinkedIn extrae el sistema por empresa para optimizar tiempos.
+            </span>
+          </div>
+
           <div className="mt-2 flex flex-col gap-2">
             <Button
               type="submit"

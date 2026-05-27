@@ -12,6 +12,7 @@ export interface ProspectRequest {
   dolor_cliente: string
   propuesta_valor: string
   limite_perfiles?: number
+  max_news_articles?: number
   triggers_compra?: string
   casos_exito?: string
   keywords_industria?: string

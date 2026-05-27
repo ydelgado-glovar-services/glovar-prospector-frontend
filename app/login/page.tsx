@@ -8,7 +8,7 @@
  * Redirects to /dashboard on successful authentication.
  */
 
-import { useState, useEffect, useCallback, type FormEvent } from "react"
+import { useState, useEffect, useCallback, Suspense, type FormEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Sparkles, Loader2, Mail, Lock, ArrowRight, UserPlus } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 
 type AuthMode = "signin" | "signup"
 
-export default function LoginPage() {
+function LoginForm() {
   const { setIsLoading: setGlobalLoading } = useAuth()
   const [mode, setMode] = useState<AuthMode>("signin")
   const [email, setEmail] = useState("")
@@ -264,5 +264,20 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground font-medium font-mono">Cargando página de acceso...</span>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

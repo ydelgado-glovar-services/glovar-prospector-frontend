@@ -29,6 +29,7 @@ const INITIAL_FORM: ProspectRequest = {
   dolor_cliente: "",
   propuesta_valor: "",
   limite_perfiles: 25,
+  max_news_articles: 3,
   triggers_compra: "",
   casos_exito: "",
   keywords_industria: "",
