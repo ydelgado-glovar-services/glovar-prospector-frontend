@@ -24,6 +24,16 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
+      global: {
+        fetch: (url, init) => {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          return fetch(url, {
+            ...init,
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeoutId))
+        },
+      },
     }
   )
 

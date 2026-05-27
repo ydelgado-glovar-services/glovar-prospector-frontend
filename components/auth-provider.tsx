@@ -62,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  // Track previous session key to prevent infinite refresh loops on initial mount/no-change
+  const prevSessionKey = useRef<string | null>(null)
 
   // createBrowserClient is naturally a singleton on the client
   const supabase = createClient()
@@ -127,14 +129,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false)
 
+      // Calculate current session key
+      const sessionKey = currentSession ? currentSession.access_token : "null"
+      const isInitial = prevSessionKey.current === null
+      const hasChanged = prevSessionKey.current !== sessionKey
+
+      // Update the reference with the new session key
+      prevSessionKey.current = sessionKey
+
       // Refresh Next.js router cache on meaningful auth transitions.
-      // TOKEN_REFRESHED: flush old SSR cache so client-side fetches use the new JWT.
+      // Only trigger router.refresh() if it is NOT the initial mount and the session has changed.
+      // This prevents the infinite redirect/refresh loops.
       if (
-        event === "SIGNED_IN" ||
-        event === "SIGNED_OUT" ||
-        event === "TOKEN_REFRESHED" ||
-        event === "USER_UPDATED"
+        !isInitial &&
+        hasChanged &&
+        (event === "SIGNED_IN" ||
+          event === "SIGNED_OUT" ||
+          event === "TOKEN_REFRESHED" ||
+          event === "USER_UPDATED")
       ) {
+        console.log(`[Auth] Auth transition detected (${event}). Triggering router.refresh() to update cache.`)
         router.refresh()
       }
     })
