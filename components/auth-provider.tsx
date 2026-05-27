@@ -19,6 +19,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react"
 import { useRouter } from "next/navigation"
@@ -91,28 +92,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    let resolved = false
+    // Bug Fix 1: `initialized` ref ensures the safety timeout only fires on first mount.
+    // Without this, every time the tab resumes from sleep, Supabase emits TOKEN_REFRESHED
+    // which triggers router.refresh() → remounts the provider → resets the timeout → loop.
+    const initialized = { current: false }
 
-    // [Sec-Driven] Safety timeout: if session initialization hangs for > 5 seconds,
-    // force-stop the loading state and resolve the session as null (unauthenticated).
-    // This prevents `authLoading` from getting permanently stuck at `true` under dormant tabs,
-    // offline states, or corrupted/expired Supabase local storage.
+    // Safety timeout: if session init hangs >6s on first load (cold start, offline, etc.),
+    // force-resolve to unauthenticated to unblock the UI.
     const authTimeout = setTimeout(() => {
-      if (!resolved) {
-        console.warn("[Auth] Initialization timed out (5s). Resolving state to unauthenticated.")
+      if (!initialized.current) {
+        console.warn("[Auth] Initialization timed out (6s). Resolving state to unauthenticated.")
         setIsLoading(false)
         setSession(null)
         setUser(null)
         setRole(null)
       }
-    }, 5000)
+    }, 6000)
 
-    // onAuthStateChange fires an INITIAL_SESSION event immediately upon mount.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, currentSession: Session | null) => {
-      resolved = true
-      clearTimeout(authTimeout) // Clear safety timeout if auth resolves successfully
+      // Mark as initialized so the safety timeout no longer has any effect
+      initialized.current = true
+      clearTimeout(authTimeout)
 
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
@@ -125,12 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false)
 
-      // [Sec-Driven] Refresh the Next.js router cache on every meaningful auth transition:
-      // - SIGNED_IN / SIGNED_OUT : obvious state changes
-      // - TOKEN_REFRESHED        : Supabase silently issued a new JWT; flush old SSR cache
-      //                           so client-side fetches immediately use the new access_token
-      //                           from context and avoid 401s during long sessions.
-      // - USER_UPDATED           : email/password change; context must re-sync immediately.
+      // Refresh Next.js router cache on meaningful auth transitions.
+      // TOKEN_REFRESHED: flush old SSR cache so client-side fetches use the new JWT.
       if (
         event === "SIGNED_IN" ||
         event === "SIGNED_OUT" ||
@@ -152,22 +150,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       console.log("[Auth] Initiating resilient signOut. Purging Supabase cookies and local state...")
       
-      // 1. Perform background Supabase sign out FIRST to ensure cookies/storage are cleared synchronously
+      // 1. Sign out from Supabase — clears cookies and local storage tokens
       await supabase.auth.signOut()
       
-      // 2. Clear state variables cleanly
+      // 2. Clear React state immediately
       setSession(null)
       setUser(null)
       setRole(null)
       
-      // 3. Navigate to login safely
+      // 3. Bug Fix 2: router.refresh() MUST run before router.push() to flush the
+      // Next.js SSR cache. Without this, the middleware still sees the stale session
+      // cookie and redirects back to /dashboard, creating a logout redirect loop.
+      router.refresh()
       router.push("/login")
     } catch (err) {
       console.error("[Auth] Error during resilient signOut. Forcing redirect to /login anyway:", err)
-      // Fallback clean state and redirect even on failure
       setSession(null)
       setUser(null)
       setRole(null)
+      router.refresh()
       router.push("/login")
     } finally {
       setIsLoading(false)

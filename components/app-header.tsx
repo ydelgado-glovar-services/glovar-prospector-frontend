@@ -1,6 +1,7 @@
 "use client"
 
-import { Sparkles, LogOut, Shield } from "lucide-react"
+import { useState } from "react"
+import { Sparkles, LogOut, Shield, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -8,6 +9,18 @@ import { SettingsDialog } from "@/components/settings-dialog"
 
 export function AppHeader() {
   const { user, role, signOut } = useAuth()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return
+    setIsSigningOut(true)
+    try {
+      await signOut()
+    } finally {
+      // Reset in case signOut fails or navigation is slow
+      setIsSigningOut(false)
+    }
+  }
 
   return (
     <header className="border-b border-border bg-card">
@@ -44,11 +57,16 @@ export function AppHeader() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={signOut}
+            onClick={handleSignOut}
+            disabled={isSigningOut}
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="h-3 w-3" />
-            <span className="hidden sm:inline">Salir</span>
+            {isSigningOut ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <LogOut className="h-3 w-3" />
+            )}
+            <span className="hidden sm:inline">{isSigningOut ? "Saliendo..." : "Salir"}</span>
           </Button>
         </div>
       </div>

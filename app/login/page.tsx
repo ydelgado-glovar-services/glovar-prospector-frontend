@@ -8,8 +8,8 @@
  * Redirects to /dashboard on successful authentication.
  */
 
-import { useState, useEffect, type FormEvent } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, type FormEvent } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Sparkles, Loader2, Mail, Lock, ArrowRight, UserPlus } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { useAuth } from "@/components/auth-provider"
@@ -31,11 +31,27 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Handle error params passed by the auth callback (e.g. expired session link)
+  const urlError = searchParams.get("error")
+  const urlErrorMessage = searchParams.get("message")
+  const sessionErrorMessage =
+    urlError === "session_expired"
+      ? "Tu sesión ha expirado. Por favor inicia sesión nuevamente."
+      : urlError === "missing_code"
+      ? "El enlace de acceso es inválido o ya fue usado."
+      : null
 
   useEffect(() => {
     setIsLoading(false)
     setGlobalLoading(false)
+    // Pre-populate error from URL params (session expiry from callback)
+    if (sessionErrorMessage) {
+      setError(sessionErrorMessage)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setGlobalLoading])
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

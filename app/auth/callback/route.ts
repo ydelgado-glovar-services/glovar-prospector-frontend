@@ -21,8 +21,15 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)
     }
+
+    // Code exchange failed (expired code, already used, etc.)
+    // Redirect with context so the login page shows a helpful message
+    console.error("[Auth Callback] Code exchange failed:", error.message)
+    return NextResponse.redirect(
+      `${origin}/login?error=session_expired&message=${encodeURIComponent(error.message)}`
+    )
   }
 
-  // If code exchange fails, redirect to login with error
-  return NextResponse.redirect(`${origin}/login`)
+  // No code present — likely a direct hit or malformed URL
+  return NextResponse.redirect(`${origin}/login?error=missing_code`)
 }

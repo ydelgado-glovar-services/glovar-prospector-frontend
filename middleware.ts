@@ -22,7 +22,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (browser icon)
      * - public folder assets (SVGs, images, etc.)
+     * - /auth/ routes (Supabase callback must run before session validation)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
