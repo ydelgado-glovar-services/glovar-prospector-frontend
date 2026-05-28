@@ -48,18 +48,10 @@ export async function apiFetch(
     })
 
     // --- INTERCEPTOR DE SESIÓN MUERTA (401) ---
-    // Si el backend rechaza el token (expirado o inválido), destruimos la sesión local de Supabase
-    // para evitar el ciclo infinito de "usuario logueado pero bloqueado".
+    // Si el backend rechaza el token, dejamos que los componentes manejen el 401
+    // de forma elegante a través de React/Next.js sin purgar síncronamente la sesión.
     if (response.status === 401) {
-      console.error(`[Security] Token rechazado por el backend (HTTP 401) en ${path}. Purgando sesión local...`)
-
-      // Destruye la memoria local (localStorage) de Supabase
-      await supabase.auth.signOut()
-
-      // Redirigimos al usuario forzosamente al login
-      if (typeof window !== "undefined") {
-        window.location.href = "/login" // O la ruta donde tengas tu formulario de entrada
-      }
+      console.warn(`[Security] Token rechazado por el backend (HTTP 401) en ${path}.`)
     }
 
     return response
