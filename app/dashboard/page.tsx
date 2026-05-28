@@ -195,7 +195,7 @@ export default function DashboardPage() {
     setTimedOutJobId(null)
     pollJob(savedJobId, session.access_token)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, isInitialized])
+  }, [session?.access_token, isInitialized])
 
   const fetchQueries = async () => {
     // [Sec-Driven] AbortController: hard 12 s ceiling to prevent indefinite hangs
@@ -257,7 +257,7 @@ export default function DashboardPage() {
     if (session) {
       fetchQueries()
     }
-  }, [session])
+  }, [session?.access_token])
 
   // Guardar estado del formulario cuando cambie, solo después de inicializar
   useEffect(() => {

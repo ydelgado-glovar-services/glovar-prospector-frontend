@@ -83,7 +83,7 @@ export function IntegrationsProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [session, pathname])
+  }, [session?.access_token, pathname])
 
   useEffect(() => {
     checkStatus()
