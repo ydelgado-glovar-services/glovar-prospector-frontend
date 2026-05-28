@@ -37,6 +37,12 @@ async function handleRequest(request: NextRequest, context: RouteContext) {
     }
     headers.set('X-User-Id', user.id);
     
+    // Inject secure backend authorization key
+    const backendApiKey = process.env.GLOVAR_BACKEND_API_KEY;
+    if (backendApiKey) {
+      headers.set('x-api-key', backendApiKey);
+    }
+    
     const requestInit: RequestInit = {
       method: request.method,
       headers: headers,

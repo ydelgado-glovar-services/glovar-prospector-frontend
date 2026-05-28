@@ -51,6 +51,18 @@ function LoginForm() {
     if (sessionErrorMessage) {
       setError(sessionErrorMessage)
     }
+
+    // Bug Fix: Purge any stale client-side Supabase session storage on login page mount
+    // to prevent desynchronized client-server state from triggering infinite redirect loops.
+    const purgeStaleSession = async () => {
+      try {
+        console.log("[Login] Purging stale client session storage on mount...")
+        await supabase.auth.signOut()
+      } catch (err) {
+        console.error("[Login] Failed to purge stale session:", err)
+      }
+    }
+    purgeStaleSession()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setGlobalLoading])
 
