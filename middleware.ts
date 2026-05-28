@@ -24,6 +24,6 @@ export const config = {
      * - public folder assets (SVGs, images, etc.)
      * - /auth/ routes (Supabase callback must run before session validation)
      */
-    "/((?!_next/static|_next/image|favicon.ico|auth/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
