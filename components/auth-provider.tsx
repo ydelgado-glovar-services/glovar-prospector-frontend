@@ -158,27 +158,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe()
     }
   }, [supabase, fetchRole, router])
-
   const signOut = useCallback(async () => {
     try {
       setIsLoading(true)
       console.log("[Auth] Initiating resilient signOut. Purging Supabase cookies and local state...")
+
+      // 1. Crear un timeout para no quedarse esperando a la red indefinidamente si Supabase.auth.signOut() se cuelga
+      const signOutPromise = supabase.auth.signOut()
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Supabase signOut network timeout")), 2000)
+      )
+
+      // Intentamos cerrar sesión en la red, pero si tarda más de 2 segundos, continuamos con la limpieza manual
+      try {
+        await Promise.race([signOutPromise, timeoutPromise])
+      } catch (timeoutErr) {
+        console.warn("[Auth] Network signOut timed out or failed. Proceeding with manual client-side purge.")
+      }
       
-      // 1. Sign out from Supabase — clears cookies and local storage tokens
-      await supabase.auth.signOut()
-      
-      // 2. Clear React state immediately
+      // 2. Limpieza manual y agresiva de cookies locales (por si acaso el SDK falló en borrarlas)
+      if (typeof window !== "undefined") {
+        // Borrar localStorage y sessionStorage de Supabase
+        localStorage.clear()
+        sessionStorage.clear()
+        
+        // Borrar todas las cookies del documento
+        const cookies = document.cookie.split("; ")
+        for (const cookie of cookies) {
+          const eqPos = cookie.indexOf("=")
+          const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie
+          // Si es una cookie de supabase (sb-) o de sesión, la borramos forzando expiración en el pasado
+          if (name.startsWith("sb-") || name.includes("auth-token")) {
+            document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`
+            document.cookie = `${name}=; Path=/; Domain=${window.location.hostname}; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`
+          }
+        }
+      }
+
+      // 3. Limpiar estado de React inmediatamente
       setSession(null)
       setUser(null)
       setRole(null)
       
-      // 3. Bug Fix 2: router.refresh() MUST run before router.push() to flush the
-      // Next.js SSR cache. Without this, the middleware still sees the stale session
-      // cookie and redirects back to /dashboard, creating a logout redirect loop.
+      // 4. Forzar el refresco de Next.js y redirigir
       router.refresh()
       router.push("/login")
     } catch (err) {
-      console.error("[Auth] Error during resilient signOut. Forcing redirect to /login anyway:", err)
+      console.error("[Auth] Exception during resilient signOut:", err)
+      // Recuperación catastrófica segura
       setSession(null)
       setUser(null)
       setRole(null)
@@ -188,7 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
     }
   }, [supabase, router])
-
 
   return (
     <AuthContext.Provider value={{ session, user, role, isLoading, setIsLoading, signOut }}>
