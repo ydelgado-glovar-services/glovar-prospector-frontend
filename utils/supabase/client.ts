@@ -23,3 +23,12 @@ export function createClient() {
   }
   return client
 }
+
+/**
+ * resetClient — Anula el singleton del cliente Supabase del browser.
+ * Debe llamarse durante el signOut para garantizar que el siguiente login
+ * instancie un cliente limpio sin ningún estado de sesión anterior en memoria.
+ */
+export function resetClient() {
+  client = null
+}

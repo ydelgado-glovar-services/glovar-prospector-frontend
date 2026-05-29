@@ -52,17 +52,22 @@ function LoginForm() {
       setError(sessionErrorMessage)
     }
 
-    // Bug Fix: Purge any stale client-side Supabase session storage on login page mount
-    // to prevent desynchronized client-server state from triggering infinite redirect loops.
-    const purgeStaleSession = async () => {
+    // Guard silencioso: si el cliente tiene una sesión activa en memoria mientras la página
+    // de login está abierta, redirige al dashboard sin emitir eventos globales de autenticación.
+    // IMPORTANTE: NO llamar supabase.auth.signOut() aquí porque emite SIGNED_OUT globalmente,
+    // lo que dispara router.refresh() en el AuthProvider → re-monta LoginForm → bucle infinito.
+    const silentSessionCheck = async () => {
       try {
-        console.log("[Login] Purging stale client session storage on mount...")
-        await supabase.auth.signOut()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          console.log("[Login] Active session detected on mount. Redirecting to /dashboard silently.")
+          router.push("/dashboard")
+        }
       } catch (err) {
-        console.error("[Login] Failed to purge stale session:", err)
+        console.warn("[Login] Silent session check failed:", err)
       }
     }
-    purgeStaleSession()
+    silentSessionCheck()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setGlobalLoading])
 

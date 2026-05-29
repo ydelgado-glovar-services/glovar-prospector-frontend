@@ -23,7 +23,7 @@ import {
   type ReactNode,
 } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/utils/supabase/client"
+import { createClient, resetClient } from "@/utils/supabase/client"
 import type { Session, User, AuthChangeEvent } from "@supabase/supabase-js"
 
 // ── Tipos ──
@@ -137,15 +137,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update the reference with the new session key
       prevSessionKey.current = sessionKey
 
-      // Refresh Next.js router cache on meaningful auth transitions.
-      // Only trigger router.refresh() if it is NOT the initial mount and the session has changed.
-      // This prevents the infinite redirect/refresh loops.
+      // Refresh Next.js router cache ONLY on real auth transitions (login / logout / profile update).
+      // TOKEN_REFRESHED is a background auto-refresh and must NOT trigger router.refresh()
+      // because it causes unnecessary Server Component re-renders and can interfere with
+      // in-progress auth state transitions (e.g. the post-logout redirect to /login).
       if (
         !isInitial &&
         hasChanged &&
         (event === "SIGNED_IN" ||
           event === "SIGNED_OUT" ||
-          event === "TOKEN_REFRESHED" ||
           event === "USER_UPDATED")
       ) {
         console.log(`[Auth] Auth transition detected (${event}). Triggering router.refresh() to update cache.`)
@@ -158,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe()
     }
   }, [supabase, fetchRole, router])
+
   const signOut = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -175,13 +176,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (timeoutErr) {
         console.warn("[Auth] Network signOut timed out or failed. Proceeding with manual client-side purge.")
       }
-      
-      // 2. Limpieza manual y agresiva de cookies locales (por si acaso el SDK falló en borrarlas)
+
+      // 2. Resetear el singleton del cliente Supabase para que el próximo login
+      // instancie un cliente limpio sin estado de sesión anterior en memoria.
+      resetClient()
+
+      // 3. Limpieza manual y agresiva de cookies locales (por si acaso el SDK falló en borrarlas)
       if (typeof window !== "undefined") {
         // Borrar localStorage y sessionStorage de Supabase
         localStorage.clear()
         sessionStorage.clear()
-        
+
         // Borrar todas las cookies del documento
         const cookies = document.cookie.split("; ")
         for (const cookie of cookies) {
@@ -195,17 +200,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 3. Limpiar estado de React inmediatamente
+      // 4. Limpiar estado de React inmediatamente
       setSession(null)
       setUser(null)
       setRole(null)
-      
-      // 4. Forzar el refresco de Next.js y redirigir
+
+      // 5. Forzar el refresco de Next.js y redirigir
       router.refresh()
       router.push("/login")
     } catch (err) {
       console.error("[Auth] Exception during resilient signOut:", err)
       // Recuperación catastrófica segura
+      resetClient()
       setSession(null)
       setUser(null)
       setRole(null)
