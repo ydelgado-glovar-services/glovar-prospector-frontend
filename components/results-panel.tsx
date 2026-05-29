@@ -401,8 +401,10 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
   const [conflictingQuery, setConflictingQuery] = useState<SavedQuery | null>(null)
   const [isUpdateMode, setIsUpdateMode] = useState(false)
 
-  // Clasificación estricta de leads según el requerimiento
-  const calificados = results.filter((r) => r.es_calificado)
+  // Clasificación de leads en 3 estados: Calificado (con lead), Empresa Apta (sin lead), Descalificado
+  const calificadosConLead = results.filter((r) => r.es_calificado && r.nombre_lead && r.nombre_lead !== "Contacto Pendiente")
+  const empresasAptas = results.filter((r) => r.es_calificado && r.nombre_lead === "Contacto Pendiente")
+  const calificados = results.filter((r) => r.es_calificado) // Total calificados (incluye empresa apta)
   const desconocidos = results.filter(
     (r) => !r.es_calificado && (!r.nombre_lead || r.nombre_lead === "Desconocido" || r.nombre_lead === "—")
   )
@@ -411,7 +413,8 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
   )
 
   const chartData = [
-    { name: "Calificados", value: calificados.length, color: "#000000" },
+    { name: "Calificados", value: calificadosConLead.length, color: "#10b981" },
+    { name: "Empresa Apta", value: empresasAptas.length, color: "#f59e0b" },
     { name: "Descartados", value: descartados.length, color: "#4b5563" },
     { name: "Desconocidos", value: desconocidos.length, color: "#9ca3af" },
   ].filter((item) => item.value > 0) // Ocultar segmentos sin valores
@@ -664,7 +667,8 @@ function DashboardContent({ results, formData, savedQueries, activeQueryId, onSa
                 data={[
                   { name: "Extraídos", value: results.length, fill: "#000000" },
                   { name: "Analizados", value: results.length - desconocidos.length, fill: "#4b5563" },
-                  { name: "Calificados", value: calificados.length, fill: "#9ca3af" },
+                  { name: "Calificados", value: calificadosConLead.length, fill: "#10b981" },
+                  { name: "Empresa Apta", value: empresasAptas.length, fill: "#f59e0b" },
                 ]}
                 margin={{ top: 20, right: 10, left: -10, bottom: 5 }}
               >
@@ -952,9 +956,13 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col items-start gap-1.5">
-                      {result.es_calificado ? (
+                      {result.es_calificado && result.nombre_lead !== "Contacto Pendiente" ? (
                         <Badge variant="default" className="text-xs bg-emerald-500 hover:bg-emerald-600">
                           Calificado
+                        </Badge>
+                      ) : result.es_calificado && result.nombre_lead === "Contacto Pendiente" ? (
+                        <Badge variant="default" className="text-xs bg-amber-500 hover:bg-amber-600">
+                          Empresa Apta
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-xs">
@@ -1129,7 +1137,7 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    {result.es_calificado ? (
+                    {result.es_calificado && result.nombre_lead !== "Contacto Pendiente" ? (
                       <div className="flex flex-col gap-1.5 items-center w-full max-w-[120px] mx-auto">
                         <ReviewEmailDialog
                           result={result}
@@ -1142,6 +1150,10 @@ function ResultsTable({ results }: { results: ProspectResult[] }) {
                           }}
                         />
                       </div>
+                    ) : result.es_calificado && result.nombre_lead === "Contacto Pendiente" ? (
+                      <Badge variant="outline" className="text-[11px] text-amber-600 dark:text-amber-400 border-amber-500/40 font-medium">
+                        Prospección Manual
+                      </Badge>
                     ) : (
                       <Badge variant="outline" className="text-[11px] text-muted-foreground font-normal">
                         Descartado
